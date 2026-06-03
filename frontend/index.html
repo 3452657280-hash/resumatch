@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ResuMatch - AI 简历匹配系统</title>
+<style>
+  :root {
+    --primary: #6366f1;
+    --primary-light: #818cf8;
+    --primary-dark: #4f46e5;
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --text-muted: #64748b;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --progress-bg: #e2e8f0;
+    --radius: 12px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.1),0 1px 2px rgba(0,0,0,0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1),0 4px 6px -4px rgba(0,0,0,0.1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans SC", sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+  .app { display: flex; min-height: 100vh; }
+  .sidebar { width: 260px; background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); color: #fff; padding: 24px 16px; display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; }
+  .sidebar-brand { display: flex; align-items: center; gap: 12px; font-size: 20px; font-weight: 700; margin-bottom: 32px; padding: 0 8px; }
+  .sidebar-brand .logo { width: 36px; height: 36px; background: var(--primary); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .sidebar-nav { flex: 1; }
+  .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 10px; color: #94a3b8; text-decoration: none; transition: all 0.2s; cursor: pointer; margin-bottom: 4px; font-size: 15px; }
+  .nav-item:hover, .nav-item.active { background: rgba(99,102,241,0.2); color: #fff; }
+  .nav-item.active { background: var(--primary); color: #fff; }
+  .nav-item .icon { font-size: 18px; width: 24px; text-align: center; }
+  .nav-item .badge { margin-left: auto; background: var(--primary); color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+  .main { margin-left: 260px; flex: 1; padding: 0; min-height: 100vh; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; padding: 16px 32px; background: var(--card); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; }
+  .topbar h1 { font-size: 20px; font-weight: 600; }
+  .topbar-status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); display: inline-block; }
+  .content { padding: 32px; }
+  .page { display: none; }
+  .page.active { display: block; }
+  .upload-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 48px 24px; text-align: center; transition: all 0.3s; cursor: pointer; background: var(--card); }
+  .upload-zone:hover, .upload-zone.dragover { border-color: var(--primary); background: #eef2ff; }
+  .upload-zone .icon { font-size: 48px; margin-bottom: 16px; }
+  .upload-zone h3 { margin-bottom: 8px; }
+  .upload-zone p { color: var(--text-muted); font-size: 14px; }
+  .upload-zone input { display: none; }
+  .card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); padding: 24px; margin-bottom: 24px; box-shadow: var(--shadow); }
+  .card-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .card-title .badge { font-size: 12px; font-weight: 500; padding: 2px 10px; border-radius: 10px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 6px; color: var(--text-muted); }
+  .form-group textarea, .form-group input, .form-group select { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; transition: border-color 0.2s; font-family: inherit; background: var(--card); }
+  .form-group textarea:focus, .form-group input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; transition: all 0.2s; text-decoration: none; }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: var(--primary-dark); }
+  .btn-outline { background: transparent; color: var(--primary); border: 1px solid var(--primary); }
+  .btn-outline:hover { background: #eef2ff; }
+  .btn-danger { background: #fff; color: var(--danger); border: 1px solid var(--danger); }
+  .btn-danger:hover { background: #fee2e2; }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .score-ring { width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 700; }
+  .score-high { background: #dcfce7; color: #16a34a; border: 4px solid #16a34a; }
+  .score-mid { background: #fef3c7; color: #d97706; border: 4px solid #d97706; }
+  .score-low { background: #fee2e2; color: #dc2626; border: 4px solid #dc2626; }
+  .tag { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; margin: 2px; }
+  .tag-matched { background: #dcfce7; color: #16a34a; }
+  .tag-missing { background: #fee2e2; color: #dc2626; }
+  .tag-weak { background: #fef3c7; color: #d97706; }
+  .resume-item { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; background: var(--card); transition: all 0.2s; }
+  .resume-item:hover { border-color: var(--primary-light); }
+  .resume-item .info { display: flex; align-items: center; gap: 12px; }
+  .resume-item .info .file-icon { font-size: 24px; }
+  .resume-item .info .name { font-weight: 500; }
+  .resume-item .info .id { font-size: 12px; color: var(--text-muted); }
+  .report-header { display: flex; gap: 32px; align-items: center; padding: 24px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 24px; }
+  .report-score { text-align: center; min-width: 120px; }
+  .report-summary { flex: 1; }
+  .report-summary h3 { margin-bottom: 8px; }
+  .skill-gap-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px; gap: 16px; }
+  .spinner { width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .toast { position: fixed; top: 20px; right: 20px; padding: 14px 20px; border-radius: 10px; color: #fff; font-size: 14px; font-weight: 500; z-index: 1000; animation: slideIn 0.3s ease; box-shadow: var(--shadow-lg); }
+  .toast-success { background: #16a34a; }
+  .toast-error { background: #dc2626; }
+  .toast-info { background: var(--primary); }
+  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  @media (max-width: 768px) { .sidebar { display: none; } .main { margin-left: 0; } .content { padding: 16px; } .topbar { padding: 12px 16px; } .report-header { flex-direction: column; text-align: center; } }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 1024px) { .grid-2 { grid-template-columns: 1fr; } }
+  .empty-state { text-align: center; padding: 48px 24px; color: var(--text-muted); }
+  .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+  /* History chart styles */
+  .chart-container { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 20px; }
+  .chart-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text); }
+  .bar-chart { display: flex; flex-direction: column; gap: 6px; }
+  .bar-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  .bar-label { min-width: 80px; text-align: right; color: var(--text-muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-track { flex: 1; height: 22px; background: var(--progress-bg); border-radius: 6px; overflow: hidden; position: relative; }
+  .bar-fill { height: 100%; border-radius: 6px; transition: width 0.5s ease; display: flex; align-items: center; padding-left: 8px; color: #fff; font-size: 11px; font-weight: 600; }
+  .bar-score-text { margin-left: 4px; font-size: 12px; font-weight: 600; color: var(--text); min-width: 28px; }
+  .skill-summary { display: flex; gap: 20px; flex-wrap: wrap; }
+  .skill-stat { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); font-size: 13px; font-weight: 500; }
+  .skill-stat .count { font-size: 18px; font-weight: 700; }
+  .skill-stat .count.green { color: #16a34a; }
+  .skill-stat .count.red { color: #dc2626; }
+  .skill-stat .count.amber { color: #d97706; }
+  .history-item { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; background: var(--card); transition: all 0.2s; cursor: pointer; }
+  .history-item:hover { border-color: var(--primary-light); }
+  .history-type-badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; background: #eef2ff; color: var(--primary); white-space: nowrap; }
+  .history-type-badge.batch { background: #fef3c7; color: #d97706; }
+  .history-jd { flex: 1; font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .history-time { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  .history-delete { font-size: 14px; cursor: pointer; opacity: 0.5; padding: 4px; transition: opacity 0.2s; }
+  .history-delete:hover { opacity: 1; }
+  .history-mini-bars { display: flex; gap: 2px; align-items: flex-end; height: 24px; min-width: 60px; }
+  .history-mini-bar { width: 8px; border-radius: 2px 2px 0 0; transition: height 0.3s ease; }
+  .history-avg-score { font-size: 12px; font-weight: 700; color: var(--primary); margin-left: 4px; min-width: 22px; text-align: center; }
+  .history-score-count { font-size: 11px; color: var(--text-muted); margin-left: 2px; }
+  .history-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 200; display: flex; align-items: center; justify-content: center; }
+  .history-modal-box { background: var(--card); border-radius: var(--radius); width: 90%; max-width: 900px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: var(--shadow-lg); }
+  .history-modal-header { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border); position: relative; }
+  .history-modal-header h3 { font-size: 16px; margin: 0; flex: 1; }
+  .history-modal-close { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-muted); padding: 0 4px; line-height: 1; }
+  .history-modal-close:hover { color: var(--text); }
+  .history-modal-body { flex: 1; overflow-y: auto; padding: 20px; }
+  .history-jd-box { background: #f1f5f9; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; font-size: 13px; color: var(--text); line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-brand"><div class="logo">📄</div>ResuMatch</div>
+    <nav class="sidebar-nav">
+      <a class="nav-item active" data-page="upload" onclick="showPage('upload')"><span class="icon">📤</span> 上传简历</a>
+      <a class="nav-item" data-page="match" onclick="showPage('match')"><span class="icon">🔍</span> 匹配分析<span class="badge" id="resume-count-badge">0</span></a>
+      <a class="nav-item" data-page="batch" onclick="showPage('batch')"><span class="icon">📊</span> 批量匹配</a>
+      <a class="nav-item" data-page="history" onclick="showPage('history')"><span class="icon">📋</span> 历史分析</a>
+      <a class="nav-item" data-page="about" onclick="showPage('about')"><span class="icon">ℹ️</span> 关于</a>
+    </nav>
+    <div style="font-size: 12px; color: #475569; padding: 12px 8px; border-top: 1px solid #334155;">ResuMatch v0.1<br>Powered by Qwen + LangChain</div>
+  </aside>
+  <main class="main">
+    <header class="topbar"><h1 id="page-title">📤 上传简历</h1><div class="topbar-status"><span class="status-dot"></span> API 已连接</div></header>
+    <div class="content">
+      <section class="page active" id="page-upload">
+        <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+          <div class="icon">📎</div>
+          <h3>点击上传或拖拽文件</h3>
+          <p>支持 PDF / DOCX 格式的简历文件</p>
+          <input type="file" id="file-input" accept=".pdf,.docx" onchange="uploadFile(event)">
+        </div>
+        <div id="resume-list" class="card" style="margin-top:24px;">
+          <div class="card-title">📄 已上传简历 <span class="badge" id="resume-count">0</span></div>
+          <div id="resume-items"></div>
+        </div>
+      </section>
+      <section class="page" id="page-match">
+        <div class="card">
+          <div class="card-title">🔍 单份匹配</div>
+          <div class="form-group"><label>选择简历</label><select id="match-resume-select"><option value="">-- 请先上传简历 --</option></select></div>
+          <div class="form-group"><label>职位描述 (JD)</label><textarea id="match-jd" rows="5" placeholder="粘贴职位描述..."></textarea></div>
+          <button class="btn btn-primary" onclick="startMatch()" id="match-btn" disabled>▶ 开始匹配</button>
+        </div>
+        <div id="match-results"></div>
+      </section>
+      <section class="page" id="page-batch">
+        <div class="card">
+          <div class="card-title">📊 批量匹配（所有简历）</div>
+          <div class="form-group"><label>职位描述 (JD)</label><textarea id="batch-jd" rows="5" placeholder="粘贴职位描述..."></textarea></div>
+          <button class="btn btn-primary" onclick="startBatchMatch()" id="batch-btn">▶ 匹配所有简历</button>
+        </div>
+        <div id="batch-results"></div>
+      </section>
+      <section class="page" id="page-history">
+        <div class="history-card" id="history-list"></div>
+        <div id="history-modal" class="history-modal" style="display:none;" onclick="if(event.target===this)closeHistoryModal()">
+          <div class="history-modal-box">
+            <div class="history-modal-header" id="hm-header"></div>
+            <div class="history-modal-body" id="hm-body"></div>
+          </div>
+        </div>
+      </section>
+      <section class="page" id="page-about">
+        <div class="card">
+          <div class="card-title">ℹ️ 关于 ResuMatch</div>
+          <p style="margin-bottom: 16px; color: var(--text-muted);">ResuMatch 是一个基于 AI 的简历匹配 & 智能分析系统，采用 LangChain + RAG 技术架构，通过通义千问大模型对简历与职位描述进行深度匹配分析。</p>
+          <p style="color: var(--text-muted);">版本: v0.1.0</p>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+<script>
+const API = '/api/v1';
+
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelector('[data-page="' + name + '"]').classList.add('active');
+  var titles = { upload: '📤 上传简历', match: '🔍 匹配分析', batch: '📊 批量匹配', history: '📋 分析历史', about: 'ℹ️ 关于' };
+  document.getElementById('page-title').textContent = titles[name] || name;
+  if (name === 'match' || name === 'batch') loadResumes();
+  if (name === 'history') loadHistory();
+  if (name === 'upload') loadResumes();
+}
+
+function toast(msg, type) {
+  type = type || 'info';
+  var t = document.createElement('div');
+  t.className = 'toast toast-' + type;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(function() { t.remove(); }, 3000);
+}
+
+function loadResumes() {
+  fetch(API + '/resumes').then(function(r) { return r.json(); }).then(function(data) {
+    document.getElementById('resume-count-badge').textContent = data.length;
+    document.getElementById('resume-count').textContent = data.length;
+    var select = document.getElementById('match-resume-select');
+    select.innerHTML = '<option value="">-- 选择简历 --</option>';
+    var itemsHtml = '';
+    for (var i = 0; i < data.length; i++) {
+      var r = data[i];
+      select.innerHTML += '<option value="' + r.resume_id + '">' + r.filename + '</option>';
+      itemsHtml += '<div class="resume-item"><div class="info"><span class="file-icon">📄</span><div><div class="name">' + escHtml(r.filename) + '</div><div class="id">' + r.resume_id + '</div></div></div><div><button class="btn btn-sm btn-outline" onclick="selectResume(\'' + r.resume_id + '\')">匹配</button> <button class="btn btn-sm btn-danger" onclick="deleteResume(\'' + r.resume_id + '\')">删除</button></div></div>';
+    }
+    document.getElementById('resume-items').innerHTML = itemsHtml || '<div class="empty-state"><div class="icon">📭</div><p>暂无简历，请上传</p></div>';
+    document.getElementById('match-btn').disabled = data.length === 0;
+  }).catch(function(e) { toast('加载简历失败', 'error'); });
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function selectResume(id) {
+  document.getElementById('match-resume-select').value = id;
+  showPage('match');
+}
+
+function uploadFile(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var formData = new FormData();
+  formData.append('file', file);
+  document.getElementById('upload-zone').innerHTML = '<div class="loading"><div class="spinner"></div><p>正在解析...</p></div>';
+  fetch(API + '/resumes/upload', { method: 'POST', body: formData }).then(function(r) {
+    if (!r.ok) return r.json().then(function(e) { throw new Error(e.detail || '上传失败'); });
+    return r.json();
+  }).then(function(data) {
+    toast('✅ 上传成功：' + data.filename, 'success');
+    document.getElementById('file-input').value = '';
+    document.getElementById('upload-zone').innerHTML = '<div class="icon">📎</div><h3>点击上传或拖拽文件</h3><p>支持 PDF / DOCX 格式的简历文件</p><input type="file" id="file-input" accept=".pdf,.docx" onchange="uploadFile(event)">';
+    loadResumes();
+  }).catch(function(e) { toast('❌ ' + e.message, 'error'); document.getElementById('file-input').value = ''; document.getElementById('upload-zone').innerHTML = '<div class="icon">📎</div><h3>点击上传或拖拽文件</h3><p>支持 PDF / DOCX 格式的简历文件</p><input type="file" id="file-input" accept=".pdf,.docx" onchange="uploadFile(event)">'; });
+}
+
+function deleteResume(id) {
+  if (!confirm('确定删除该简历？')) return;
+  fetch(API + '/resumes/' + id, { method: 'DELETE' }).then(function(r) {
+    if (r.ok) { loadResumes(); toast('已删除', 'success'); }
+    else { toast('删除失败', 'error'); }
+  }).catch(function() { toast('删除失败', 'error'); });
+}
+
+function startMatch() {
+  var resumeId = document.getElementById('match-resume-select').value;
+  var jd = document.getElementById('match-jd').value.trim();
+  if (!resumeId) { toast('请选择简历', 'error'); return; }
+  if (!jd) { toast('请输入职位描述', 'error'); return; }
+  var btn = document.getElementById('match-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:3px;"></div> 匹配中...';
+  document.getElementById('match-results').innerHTML = '<div class="loading"><div class="spinner"></div><p>AI 正在分析匹配...</p></div>';
+  fetch(API + '/match', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resume_id: resumeId, jd_text: jd }) }).then(function(r) {
+    if (!r.ok) return r.json().then(function(e) { throw new Error(e.detail || '匹配失败'); });
+    return r.json();
+  }).then(function(data) {
+    var el = document.getElementById('match-results');
+    el.innerHTML = '';
+    for (var i = 0; i < data.results.length; i++) {
+      var div = document.createElement('div');
+      renderReport(data.results[i], div, false);
+      el.appendChild(div);
+    }
+    toast('✅ 匹配完成！', 'success');
+    showPage('history');
+  }).catch(function(e) { toast('❌ ' + e.message, 'error'); });
+  btn.disabled = false;
+  btn.innerHTML = '▶ 开始匹配';
+}
+
+async function startBatchMatch() {
+  var jd = document.getElementById('batch-jd').value.trim();
+  if (!jd) { toast('请输入职位描述', 'error'); return; }
+  var btn = document.getElementById('batch-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:3px;"></div> 匹配中...';
+  var res = await fetch(API + '/resumes');
+  var resumes = await res.json();
+  document.getElementById('batch-results').innerHTML = '<div class="loading"><div class="spinner"></div><p>正在匹配 ' + resumes.length + ' 份简历...</p></div>';
+  try {
+    var r = await fetch(API + '/match-all', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resume_id: '', jd_text: jd }) });
+    if (!r.ok) { var e = await r.json(); throw new Error(e.detail || '匹配失败'); }
+    var data = await r.json();
+    var el = document.getElementById('batch-results');
+    el.innerHTML = '<div class="card"><div class="card-title">📊 匹配结果排名 <span class="badge" style="background:var(--primary);color:#fff;">' + data.total_resumes + ' 份</span></div></div>';
+    for (var i = 0; i < data.results.length; i++) {
+      var div = document.createElement('div');
+      renderReport(data.results[i], div, true);
+      el.appendChild(div);
+    }
+    toast('✅ 批量匹配完成！', 'success');
+    showPage('history');
+  } catch (e) { toast('❌ ' + e.message, 'error'); }
+  btn.disabled = false;
+  btn.innerHTML = '▶ 匹配所有简历';
+}
+
+function renderReport(result, container, compact) {
+  compact = compact || false;
+  var score = result.overall_score;
+  var scoreClass = score >= 70 ? 'score-high' : score >= 40 ? 'score-mid' : 'score-low';
+  var strengths = result.strengths || [];
+  var weaknesses = result.weaknesses || [];
+  var gaps = result.skill_gaps || [];
+  var suggestions = result.suggestions || [];
+
+  var gapsHtml = gaps.map(function(g) {
+    var cls = g.status === 'matched' ? 'tag-matched' : g.status === 'missing' ? 'tag-missing' : 'tag-weak';
+    var icons = { matched: '✅', missing: '❌', weak: '⚠️' };
+    return '<span class="tag ' + cls + '">' + (icons[g.status] || '❓') + ' ' + g.skill + '</span>';
+  }).join('');
+
+  container.innerHTML = '<div class="report-header" style="' + (compact ? 'padding:16px;margin-bottom:16px;' : '') + '">'
+    + '<div class="report-score"><div class="score-ring ' + scoreClass + '">' + score + '</div><div style="font-size:12px;color:var(--text-muted);">匹配分</div></div>'
+    + '<div class="report-summary"><div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;"><span style="font-size:12px;color:var(--text-muted);">📄 ' + (result.resume_id || '') + '</span></div>'
+    + '<p style="color:var(--text-muted);font-size:14px;">' + (result.summary || '暂无总结') + '</p></div></div>'
+    + '<div style="display:grid;grid-template-columns:' + (compact ? '1fr 1fr' : '1fr 1fr') + ';gap:16px;">'
+    + (strengths.length ? '<div class="card" style="box-shadow:none;"><div class="card-title" style="font-size:14px;">💪 优势</div>' + strengths.map(function(s) { return '<div style="font-size:13px;padding:4px 0;">✅ ' + s + '</div>'; }).join('') + '</div>' : '')
+    + (weaknesses.length ? '<div class="card" style="box-shadow:none;"><div class="card-title" style="font-size:14px;">⚠️ 不足</div>' + weaknesses.map(function(w) { return '<div style="font-size:13px;padding:4px 0;">⚠️ ' + w + '</div>'; }).join('') + '</div>' : '')
+    + '</div>'
+    + (gaps.length ? '<div class="card" style="box-shadow:none;margin-top:16px;"><div class="card-title" style="font-size:14px;">🔧 技能差距分析</div><div class="skill-gap-list">' + gapsHtml + '</div></div>' : '')
+    + (suggestions.length ? '<div class="card" style="box-shadow:none;margin-top:16px;"><div class="card-title" style="font-size:14px;">💡 改进建议</div>' + suggestions.map(function(s) { return '<div style="font-size:13px;padding:3px 0;">💡 ' + s + '</div>'; }).join('') + '</div>' : '');
+}
+
+// ── Chart helpers ──
+function scoreColor(score) {
+  if (score >= 80) return '#16a34a';
+  if (score >= 60) return '#d97706';
+  return '#dc2626';
+}
+
+function renderMiniBars(scores, avgScore, count) {
+  if (!scores || scores.length === 0) return '<span class="history-avg-score" style="color:var(--text-muted);">-</span>';
+  var bars = '';
+  for (var i = 0; i < Math.min(scores.length, 5); i++) {
+    var h = Math.max(4, (scores[i] / 100) * 24);
+    bars += '<div class="history-mini-bar" style="height:' + h + 'px;background:' + scoreColor(scores[i]) + ';" title="' + scores[i] + '分"></div>';
+  }
+  return '<div class="history-mini-bars">' + bars + '</div>'
+    + '<span class="history-avg-score" style="color:' + scoreColor(avgScore) + ';">' + avgScore + '</span>'
+    + '<span class="history-score-count">×' + count + '</span>';
+}
+
+function renderScoreChart(results) {
+  var html = '<div class="chart-container"><div class="chart-title">📊 匹配得分分布</div><div class="bar-chart">';
+  for (var i = 0; i < results.length; i++) {
+    var r = results[i];
+    var pct = r.overall_score;
+    var name = (r.resume_filename || r.resume_id || '?');
+    if (name.length > 18) name = name.substring(0, 15) + '...';
+    html += '<div class="bar-row">'
+      + '<span class="bar-label" title="' + escHtml(r.resume_filename || r.resume_id) + '">' + escHtml(name) + '</span>'
+      + '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;background:' + scoreColor(pct) + ';"></div></div>'
+      + '<span class="bar-score-text" style="color:' + scoreColor(pct) + ';">' + pct + '分</span></div>';
+  }
+  html += '</div></div>';
+  return html;
+}
+
+function renderSkillSummary(results) {
+  var matched = 0, missing = 0, weak = 0;
+  for (var i = 0; i < results.length; i++) {
+    var gaps = results[i].skill_gaps || [];
+    for (var j = 0; j < gaps.length; j++) {
+      if (gaps[j].status === 'matched') matched++;
+      else if (gaps[j].status === 'missing') missing++;
+      else if (gaps[j].status === 'weak') weak++;
+    }
+  }
+  var total = matched + missing + weak;
+  if (total === 0) return '';
+  var html = '<div class="chart-container"><div class="chart-title">🔧 技能差距统计（共 ' + total + ' 项）</div>'
+    + '<div class="skill-summary">'
+    + '<div class="skill-stat">✅ 已匹配 <span class="count green">' + matched + '</span></div>'
+    + '<div class="skill-stat">⚠️ 薄弱 <span class="count amber">' + weak + '</span></div>'
+    + '<div class="skill-stat">❌ 缺失 <span class="count red">' + missing + '</span></div>'
+    + '</div>';
+  if (total > 0) {
+    var mp = Math.round(matched / total * 100);
+    var wp = Math.round(weak / total * 100);
+    var xp = 100 - mp - wp;
+    html += '<div style="display:flex;height:12px;border-radius:6px;overflow:hidden;margin-top:10px;">'
+      + (mp > 0 ? '<div style="width:' + mp + '%;background:#16a34a;"></div>' : '')
+      + (wp > 0 ? '<div style="width:' + wp + '%;background:#d97706;"></div>' : '')
+      + (xp > 0 ? '<div style="width:' + xp + '%;background:#dc2626;"></div>' : '')
+      + '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+// ── History ──
+function loadHistory() {
+  var el = document.getElementById('history-list');
+  el.innerHTML = '<div class="loading" style="padding:40px;"><div class="spinner"></div></div>';
+  fetch(API + '/history').then(function(r) { return r.json(); }).then(function(data) {
+    if (!data.records || data.records.length === 0) {
+      el.innerHTML = '<div class="history-empty" style="padding:60px 20px;text-align:center;color:var(--text-muted);"><div style="font-size:36px;margin-bottom:8px;">📭</div><p style="font-size:14px;">暂无分析记录</p></div>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < data.records.length; i++) {
+      var rec = data.records[i];
+      var badgeClass = rec.match_type === 'batch' ? 'history-type-badge batch' : 'history-type-badge';
+      var label = rec.match_type === 'batch' ? '📊 批量' : '🔍 单份';
+      var jd = rec.jd_text || '';
+      var jdShort = jd.length > 50 ? jd.substring(0, 50) + '...' : jd;
+      var miniBars = renderMiniBars(rec.top_scores || [], rec.avg_score || 0, rec.score_count || 0);
+      html += '<div class="history-item" onclick="showHistoryDetail(&quot;' + rec.id + '&quot;)">'
+        + '<span class="' + badgeClass + '">' + label + '</span>'
+        + '<span class="history-jd">' + escHtml(jdShort) + '</span>'
+        + miniBars
+        + '<span class="history-time">' + fmtTime(rec.created_at) + '</span>'
+        + '<span class="history-delete" onclick="event.stopPropagation();delHistory(&quot;' + rec.id + '&quot;)">🗑️</span>'
+        + '</div>';
+    }
+    el.innerHTML = html;
+  }).catch(function() {
+    el.innerHTML = '<div class="history-empty" style="padding:60px 20px;text-align:center;color:var(--text-muted);"><div style="font-size:36px;margin-bottom:8px;">❌</div><p style="font-size:14px;">加载失败</p></div>';
+  });
+}
+
+function fmtTime(iso) {
+  if (!iso) return '';
+  var d = new Date(iso);
+  var pad2 = function(n) { return String(n).padStart(2, '0'); };
+  return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+}
+
+function showHistoryDetail(id) {
+  fetch(API + '/history/' + id).then(function(r) { return r.json(); }).then(function(rec) {
+    var report = rec.report;
+    if (!report) { alert('无数据'); return; }
+    var label = rec.match_type === 'batch' ? '📊 批量匹配' : '🔍 单份匹配';
+    document.getElementById('hm-header').innerHTML = '<h3>' + label + '</h3>'
+      + '<span style="font-size:13px;color:var(--text-muted);">' + fmtTime(rec.created_at) + '</span>'
+      + '<button class="history-modal-close" onclick="closeHistoryModal()">&times;</button>';
+    var bodyHtml = '<div class="history-jd-box"><strong>JD：</strong>' + escHtml(rec.jd_text) + '</div>';
+    if (report.results && report.results.length > 1) {
+      bodyHtml += renderScoreChart(report.results);
+    }
+    bodyHtml += renderSkillSummary(report.results);
+    for (var i = 0; i < report.results.length; i++) {
+      var div = document.createElement('div');
+      renderReport(report.results[i], div, true);
+      bodyHtml += div.innerHTML;
+    }
+    document.getElementById('hm-body').innerHTML = bodyHtml;
+    document.getElementById('history-modal').style.display = 'flex';
+  }).catch(function(e) {
+    toast('加载失败', 'error');
+  });
+}
+
+function closeHistoryModal() {
+  document.getElementById('history-modal').style.display = 'none';
+}
+
+function delHistory(id) {
+  if (!confirm('确定删除这条分析记录？')) return;
+  fetch(API + '/history/' + id, { method: 'DELETE' }).then(function(r) {
+    if (r.ok) { loadHistory(); toast('已删除', 'success'); }
+    else { toast('删除失败', 'error'); }
+  }).catch(function() { toast('删除失败', 'error'); });
+}
+
+loadResumes();
+</script>
+</body>
+</html>

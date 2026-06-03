@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Data
+data/chroma/
+data/uploads/
+!data/chroma/.gitkeep
+!data/uploads/.gitkeep
+
+# Env
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+data/history.db

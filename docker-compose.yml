@@ -1,0 +1,10 @@
+services:
+  resumatch:
+    build: .
+    ports:
+      - "8000:8000"   # FastAPI
+      - "8501:8501"   # Streamlit
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
