@@ -131,6 +131,63 @@
   .history-modal-close:hover { color: var(--text); }
   .history-modal-body { flex: 1; overflow-y: auto; padding: 20px; }
   .history-jd-box { background: #f1f5f9; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; font-size: 13px; color: var(--text); line-height: 1.7; }
+
+  /* AI Assistant floating button + panel */
+  .ai-btn {
+    position: fixed; bottom: 24px; right: 24px;
+    width: 48px; height: 48px; border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    color: #fff; font-size: 20px; border: none;
+    cursor: pointer; box-shadow: 0 4px 12px rgba(99,102,241,0.4);
+    z-index: 300; display: flex; align-items: center; justify-content: center;
+    transition: all 0.3s ease;
+  }
+  .ai-btn:hover { transform: scale(1.1); box-shadow: 0 6px 20px rgba(99,102,241,0.5); }
+  .ai-btn.open { transform: rotate(45deg); }
+  .ai-panel {
+    position: fixed; bottom: 84px; right: 24px;
+    width: 340px; max-height: 460px;
+    background: var(--card); border-radius: 16px;
+    border: 1px solid var(--border); box-shadow: var(--shadow-lg);
+    z-index: 299; display: none; flex-direction: column;
+    overflow: hidden; animation: slideUp 0.3s ease;
+  }
+  .ai-panel.open { display: flex; }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  .ai-panel-header {
+    padding: 14px 16px; background: linear-gradient(135deg, #6366f1, #4f46e5);
+    color: #fff; font-size: 14px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .ai-panel-body {
+    flex: 1; overflow-y: auto; padding: 12px 16px;
+    font-size: 13px; color: var(--text); line-height: 1.6;
+    min-height: 80px; max-height: 320px;
+  }
+  .ai-msg { margin-bottom: 10px; }
+  .ai-msg.bot { color: var(--text); }
+  .ai-msg.user { color: var(--primary); text-align: right; font-weight: 500; }
+  .ai-msg .time { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .ai-panel-input {
+    display: flex; gap: 8px; padding: 10px 12px;
+    border-top: 1px solid var(--border);
+  }
+  .ai-panel-input input {
+    flex: 1; border: 1px solid var(--border); border-radius: 20px;
+    padding: 8px 14px; font-size: 13px; outline: none;
+  }
+  .ai-panel-input input:focus { border-color: var(--primary); }
+  .ai-panel-input button {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--primary); color: #fff; border: none;
+    cursor: pointer; font-size: 16px; display: flex;
+    align-items: center; justify-content: center;
+  }
+  .ai-panel-input button:hover { background: var(--primary-dark); }
+  @media (max-width: 480px) {
+    .ai-panel { width: calc(100vw - 32px); right: 16px; bottom: 76px; }
+  }
+
 </style>
 </head>
 <body>
@@ -144,7 +201,7 @@
       <a class="nav-item" data-page="history" onclick="showPage('history')"><span class="icon">📋</span> 历史分析</a>
       <a class="nav-item" data-page="about" onclick="showPage('about')"><span class="icon">ℹ️</span> 关于</a>
     </nav>
-    <div style="font-size: 12px; color: #475569; padding: 12px 8px; border-top: 1px solid #334155;">ResuMatch v0.1<br>Powered by Qwen + LangChain</div>
+    <div style="font-size: 12px; color: #475569; padding: 12px 8px; border-top: 1px solid #334155;">ResuMatch v0.2<br>Powered by Qwen + ChromaDB</div>
   </aside>
   <main class="main">
     <header class="topbar"><h1 id="page-title">📤 上传简历</h1><div class="topbar-status"><span class="status-dot"></span> API 已连接</div></header>
@@ -154,8 +211,8 @@
           <div class="icon">📎</div>
           <h3>点击上传或拖拽文件</h3>
           <p>支持 PDF / DOCX 格式的简历文件</p>
-          <input type="file" id="file-input" accept=".pdf,.docx" onchange="uploadFile(event)">
         </div>
+        <input type="file" id="file-input" accept=".pdf,.docx" onchange="uploadFile(event)" style="display:none;">
         <div id="resume-list" class="card" style="margin-top:24px;">
           <div class="card-title">📄 已上传简历 <span class="badge" id="resume-count">0</span></div>
           <div id="resume-items"></div>
@@ -190,8 +247,8 @@
       <section class="page" id="page-about">
         <div class="card">
           <div class="card-title">ℹ️ 关于 ResuMatch</div>
-          <p style="margin-bottom: 16px; color: var(--text-muted);">ResuMatch 是一个基于 AI 的简历匹配 & 智能分析系统，采用 LangChain + RAG 技术架构，通过通义千问大模型对简历与职位描述进行深度匹配分析。</p>
-          <p style="color: var(--text-muted);">版本: v0.1.0</p>
+          <p style="margin-bottom: 16px; color: var(--text-muted);">ResuMatch 是一个基于 Agent 的简历匹配 & 智能分析系统，采用通义千问（DashScope API）+ ChromaDB 向量检索技术栈，通过通义千问大模型对简历与职位描述进行深度匹配分析。</p>
+          <p style="color: var(--text-muted);">版本: v0.2.0<br>技术栈: Python / FastAPI / ChromaDB / Qwen / PyMuPDF</p>
         </div>
       </section>
     </div>
@@ -243,25 +300,45 @@ function escHtml(s) {
 }
 
 function selectResume(id) {
-  document.getElementById('match-resume-select').value = id;
   showPage('match');
+  setTimeout(function() {
+    var sel = document.getElementById('match-resume-select');
+    if (sel) { sel.value = id; }
+    loadResumePreview(id);
+  }, 100);
 }
 
 function uploadFile(e) {
-  var file = e.target.files[0];
-  if (!file) return;
-  var formData = new FormData();
-  formData.append('file', file);
-  document.getElementById('upload-zone').innerHTML = '<div class="loading"><div class="spinner"></div><p>正在解析...</p></div>';
-  fetch(API + '/resumes/upload', { method: 'POST', body: formData }).then(function(r) {
-    if (!r.ok) return r.json().then(function(e) { throw new Error(e.detail || '上传失败'); });
-    return r.json();
-  }).then(function(data) {
-    toast('✅ 上传成功：' + data.filename, 'success');
-    document.getElementById('file-input').value = '';
-    document.getElementById('upload-zone').innerHTML = '<div class="icon">📎</div><h3>点击上传或拖拽文件</h3><p>支持 PDF / DOCX 格式的简历文件</p><input type="file" id="file-input" accept=".pdf,.docx" onchange="uploadFile(event)">';
-    loadResumes();
-  }).catch(function(e) { toast('❌ ' + e.message, 'error'); document.getElementById('file-input').value = ''; document.getElementById('upload-zone').innerHTML = '<div class="icon">📎</div><h3>点击上传或拖拽文件</h3><p>支持 PDF / DOCX 格式的简历文件</p><input type="file" id="file-input" accept=".pdf,.docx" onchange="uploadFile(event)">'; });
+  try {
+    var fi = document.getElementById('file-input');
+    if (!fi) return;
+    var file = fi.files ? fi.files[0] : null;
+    if (!file) return;
+    var formData = new FormData();
+    formData.append('file', file);
+    var zone = document.getElementById('upload-zone');
+    if (zone) zone.innerHTML = '<div class="loading" style="padding:48px;"><div class="spinner"></div><p>正在解析...</p></div>';
+    fetch(API + '/resumes/upload', { method: 'POST', body: formData }).then(function(r) {
+      if (!r.ok) return r.json().then(function(e) { throw new Error(e.detail || '上传失败'); });
+      return r.json();
+    }).then(function(data) {
+      toast('✅ 上传成功：' + data.filename, 'success');
+      try { fi.value = ''; } catch(ex) {}
+      resetUploadZone();
+      loadResumes();
+    }).catch(function(e) {
+      toast('❌ ' + (e.message || '上传失败'), 'error');
+      resetUploadZone();
+    });
+  } catch(ex) {
+    toast('❌ 上传出错', 'error');
+    resetUploadZone();
+  }
+}
+
+function resetUploadZone() {
+  var z = document.getElementById('upload-zone');
+  if (z) z.innerHTML = '<div class="icon">📎</div><h3>点击上传或拖拽文件</h3><p>支持 PDF / DOCX 格式的简历文件</p>';
 }
 
 function deleteResume(id) {
@@ -495,7 +572,77 @@ function delHistory(id) {
   }).catch(function() { toast('删除失败', 'error'); });
 }
 
+
+function toggleAI() {
+  var btn = document.getElementById('ai-btn');
+  var panel = document.getElementById('ai-panel');
+  btn.classList.toggle('open');
+  panel.classList.toggle('open');
+  if (panel.classList.contains('open')) {
+    document.getElementById('ai-input').focus();
+  }
+}
+
+function sendAI() {
+  var input = document.getElementById('ai-input');
+  var q = input.value.trim();
+  if (!q) return;
+  input.value = '';
+  var body = document.getElementById('ai-body');
+  body.innerHTML += '<div class="ai-msg user">' + escHtml(q) + '</div>';
+  body.scrollTop = body.scrollHeight;
+
+  // Local responses based on common questions
+  var answer = getAIAnswer(q);
+  setTimeout(function() {
+    body.innerHTML += '<div class="ai-msg bot">' + answer + '</div>';
+    body.scrollTop = body.scrollHeight;
+  }, 300 + Math.random() * 500);
+}
+
+function getAIAnswer(q) {
+  q = q.toLowerCase();
+  if (q.indexOf('上传') >= 0 || q.indexOf('简历') >= 0 && q.indexOf('怎么') >= 0) {
+    return '上传简历很简单：点击上传区的「📤 上传简历」页面，可以点击选择文件或直接拖拽 PDF/DOCX 文件到上传区域。系统会自动解析并向量化存入数据库。';
+  }
+  if (q.indexOf('匹配') >= 0 || q.indexOf('分析') >= 0) {
+    return '匹配分析有两种方式：<br>1. <b>单份匹配</b> — 选择一份简历，填写 JD 后开始匹配<br>2. <b>批量匹配</b> — 填写 JD 后自动匹配所有简历<br>系统会使用 Agent 多关键词搜索 + LLM 评分，给出详细的分析报告。';
+  }
+  if (q.indexOf('技术') >= 0 || q.indexOf('技术栈') >= 0 || q.indexOf('架构') >= 0) {
+    return '技术栈：Python / FastAPI / ChromaDB / 通义千问（DashScope API）/ PyMuPDF。前端的纯 HTML/CSS/JS，无框架。';
+  }
+  if (q.indexOf('hello') >= 0 || q.indexOf('hi') >= 0 || q.indexOf('你好') >= 0) {
+    return '你好！有什么可以帮助你的吗？比如「怎么上传简历」或「如何做匹配分析」。';
+  }
+  if (q.indexOf('历史') >= 0 || q.indexOf('记录') >= 0) {
+    return '历史分析记录在「📋 历史分析」页面，可以查看之前的匹配报告、搜索记录、查看分数趋势图。';
+  }
+  if (q.indexOf('分数') >= 0 || q.indexOf('评分') >= 0) {
+    return '匹配分数是 LLM 根据技术匹配度（40%）、经验相关度（30%）、项目质量（20%）、软技能（10%）四个维度综合评定的。';
+  }
+  if (q.indexOf('你是谁') >= 0 || q.indexOf('你是什么') >= 0 || q.indexOf('who are you') >= 0 || q.indexOf('名字') >= 0) {
+    return '我是 ResuMatch AI 助手，也叫小 R。我是你的简历匹配分析助手，可以帮助你了解系统的使用方法、匹配分析流程、技术栈等信息。有什么想问的吗？';
+  }
+  if (q.indexOf('你能做什么') >= 0 || q.indexOf('功能') >= 0) {
+    return '我可以做这些事：<br>1. 告诉你如何上传简历<br>2. 解释匹配分析的流程和评分规则<br>3. 介绍系统的技术栈<br>4. 引导你查看历史记录和趋势图<br>有什么需要帮忙的吗？';
+  }
+  return '抱歉，我还没学会回答这个问题。目前我可以回答：上传简历、匹配分析、技术栈、历史记录、你是谁等问题。';
+}
+
 loadResumes();
 </script>
+
+<button class="ai-btn" id="ai-btn" onclick="toggleAI()">💬</button>
+<div class="ai-panel" id="ai-panel">
+  <div class="ai-panel-header">🤖 AI 助手</div>
+  <div class="ai-panel-body" id="ai-body">
+    <div class="ai-msg bot">你好！我是 ResuMatch AI 助手，可以帮你解答关于系统使用、匹配结果等问题。</div>
+  </div>
+  <div class="ai-panel-input">
+    <input type="text" id="ai-input" placeholder="输入问题..." onkeydown="if(event.key==='Enter')sendAI()">
+    <button onclick="sendAI()">➤</button>
+  </div>
+</div>
+
 </body>
 </html>

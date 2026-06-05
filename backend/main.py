@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.config import settings, get_llm, get_embeddings
+from app.config import settings, get_llm, get_embedder
 from backend.routes import router
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
@@ -15,9 +15,9 @@ FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     llm = get_llm()
-    embeddings = get_embeddings()
+    embedder = get_embedder()
     app.state.llm = llm
-    app.state.embeddings = embeddings
+    app.state.embedder = embedder
     yield
 
 

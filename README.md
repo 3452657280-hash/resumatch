@@ -1,25 +1,28 @@
 # ResuMatch — AI 简历匹配 & 智能分析系统
 
-> 基于 LangChain + RAG 的智能简历匹配工具，支持单份 / 批量简历与职位描述（JD）的深度匹配分析。
+> Agent 驱动的简历匹配系统，支持单份 / 批量简历与职位描述（JD）的深度匹配分析。
 
 ## 功能
 
-- 📤 **简历上传 & 解析** — 支持 PDF / DOCX，自动提取文本并向量化存入 ChromaDB
-- 🔍 **单份匹配** — 针对一份简历与 JD 进行深度分析（评分、技能差距、改进建议）
-- 📊 **批量匹配** — 所有简历统一排名，快速筛选最佳候选人
-- 🤖 **AI 分析报告** — 基于通义千问（Qwen）大模型，输出结构化评分和详细建议
+- 📤 **简历上传 & 解析** — 支持 PDF / DOCX，自动提取文本并向量化存入 ChromaDB，LLM 验证解析质量
+- 🔍 **单份匹配** — Agent 模式：提取 JD 关键词 → 多维度搜索简历 → LLM 评分 + 自我检查
+- 📊 **批量匹配** — 所有简历统一排名，带排名徽标，快速筛选最佳候选人
+- 📈 **匹配趋势** — 历史分数折线图，追踪匹配效果变化
+- 🤖 **AI 助手** — 内置智能问答助手，解答使用问题
+- 📱 **移动端适配** — 侧边栏折叠，手机可用
 
 ## 技术栈
 
 | 层 | 技术 |
 |---|---|
-| 后端框架 | FastAPI (Python) |
-| RAG 框架 | LangChain |
-| 向量数据库 | ChromaDB |
+| 后端框架 | FastAPI (Python 3.11+) |
+| AI Agent | 纯 httpx 调用通义千问 DashScope API |
+| 向量数据库 | ChromaDB（原生客户端，无 LangChain） |
 | LLM | 通义千问 qwen-max |
 | Embedding | 通义千问 text-embedding-v3 |
 | 简历解析 | PyMuPDF + python-docx |
-| 前端 | Streamlit |
+| 前端 | 纯 HTML/CSS/JS 单页面（无框架） |
+| 历史存储 | SQLite |
 | 部署 | Docker / Docker Compose |
 
 ## 快速开始
@@ -28,14 +31,15 @@
 
 ```bash
 # 1. 安装依赖
-pip install poetry
-poetry install
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 
-# 2. 配置 API Key（已配置在 .env 中）
+# 2. 配置 API Key
 # 编辑 .env 文件确认 DASHSCOPE_API_KEY 正确
 
-# 3. 同时启动后端 + 前端
-./run.sh all
+# 3. 启动 API + 前端
+./run.sh api
 ```
 
 ### 方式二：Docker
@@ -48,37 +52,43 @@ docker compose up --build
 
 | 服务 | 地址 |
 |---|---|
-| FastAPI | http://localhost:8000 |
-| API 文档 | http://localhost:8000/docs |
-| Streamlit | http://localhost:8501 |
+| 前端页面 | http://localhost:8001 |
+| API 文档 | http://localhost:8001/docs |
 
 ## 项目结构
 
 ```
 resumatch/
-├── app/
-│   ├── config.py       # 全局配置 & LLM 初始化
-│   └── models.py       # Pydantic 数据模型
+├── frontend/
+│   └── index.html       # 前端单页面（HTML + CSS + JS）
 ├── backend/
-│   ├── main.py         # FastAPI 入口
-│   └── routes.py       # API 路由
+│   ├── main.py           # FastAPI 入口
+│   └── routes.py         # API 路由
 ├── services/
-│   ├── parser.py       # 简历解析 (PDF/DOCX)
-│   ├── rag.py          # RAG 引擎 (LangChain + Chroma)
-│   └── matcher.py      # 匹配分析 (LLM 评分)
-├── frontend.py         # Streamlit 前端
-├── data/               # 数据目录（上传文件 / Chroma 持久化）
+│   ├── matcher.py        # Agent 匹配器（两阶段关键词搜索 + 评分）
+│   ├── rag.py            # ChromaDB 向量检索引擎
+│   ├── parser.py         # 简历解析 (PDF/DOCX) + LLM 质量验证
+│   └── history.py        # SQLite 历史记录
+├── app/
+│   ├── config.py         # 配置、LLM/Embedding 客户端
+│   └── models.py         # Pydantic 数据模型
+├── data/                 # 数据目录（上传文件 / Chroma 持久化 / SQLite）
 ├── Dockerfile
 ├── docker-compose.yml
-└── pyproject.toml
+├── pyproject.toml
+└── requirements.txt
 ```
 
 ## API 接口
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/api/v1/resumes/upload` | 上传简历 |
+| POST | `/api/v1/resumes/upload` | 上传简历（PDF/DOCX） |
 | GET | `/api/v1/resumes` | 列出所有简历 |
-| POST | `/api/v1/match` | 单份匹配 |
-| POST | `/api/v1/match-all` | 批量匹配 |
+| DELETE | `/api/v1/resumes/{id}` | 删除简历 |
+| GET | `/api/v1/resumes/{id}/text` | 获取简历文本 |
+| POST | `/api/v1/match` | 单份 Agent 匹配 |
+| POST | `/api/v1/match-all` | 批量 Agent 匹配 |
+| GET | `/api/v1/history` | 历史记录列表 |
+| GET/DELETE | `/api/v1/history/{id}` | 查看/删除历史详情 |
 | GET | `/health` | 健康检查 |

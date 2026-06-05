@@ -36,6 +36,7 @@ class UploadResponse(BaseModel):
     filename: str
     page_count: int
     text_preview: str = ""
+    quality_warnings: list[str] = []
 
 
 class ErrorResponse(BaseModel):
