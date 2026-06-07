@@ -51,6 +51,7 @@ async def upload_resume(
     chunk_count = rag.add_resume(
         parsed["resume_id"], parsed["filename"], parsed["text"],
         content_hash=content_hash,
+        sections=parsed.get("sections"),
     )
 
     response = UploadResponse(
