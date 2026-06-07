@@ -22,9 +22,26 @@ resumatch/
 
 ## 架构说明
 
-- **Agent 匹配器**（`services/matcher.py`）：两阶段式——先提取 JD 关键词，再并发搜索简历片段，最后 LLM 评分 + 自我检查。全程只调 2 次 LLM。
-- **RAG 引擎**（`services/rag.py`）：原生 ChromaDB 客户端，无 LangChain 依赖。中文友好文本分块器替代 LangChain 的 RecursiveCharacterTextSplitter。
-- **LLM 接入**（`app/config.py`）：纯 httpx 调用 DashScope 的 OpenAI 兼容接口，不依赖 LangChain。
+### Agent 匹配流程（services/matcher.py）
+
+3 阶段设计：
+
+1. **JD 关键词提取** — LLM 提取结构化标签（required_skills、preferred_skills、experience_years、responsibilities、education）
+2. **检索 + Rerank** — 标签转向量 → ChromaDB 搜索 → LLM Rerank 重排取 Top-5
+3. **评分 + 自检** — LLM 按权重综合打分，二次审查(self_check)确认无误后返回
+
+全程只调 3 次 LLM（提取 → rerank → 评分+自检），纯 httpx 实现。
+
+### RAG 引擎（services/rag.py）
+
+- 原生 ChromaDB 客户端，无 LangChain 依赖
+- 中文友好文本分块器（chunk_size=500, overlap=100）
+- 元数据包含 resume_id、filename、chunk_index
+
+### LLM 接入（app/config.py）
+
+- 纯 httpx 调用 DashScope 的 OpenAI 兼容接口
+- 不依赖 LangChain 或其他第三方 Agent 框架
 
 ## 代码风格
 
