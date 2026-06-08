@@ -20,3 +20,7 @@ data/uploads/
 *.swp
 
 data/history.db
+
+# Generated
+output/
+.DS_Store
