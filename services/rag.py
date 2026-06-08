@@ -7,6 +7,7 @@ import chromadb
 from chromadb.config import Settings as ChromaSettings
 
 from app.config import DashScopeEmbedder
+from services.reranker import RerankerService
 
 # 常见技能关键词列表（用于自动标注 chunk 所属技能）
 COMMON_SKILLS = [
@@ -93,6 +94,7 @@ class ResumeRAG:
     def __init__(self, embedder: DashScopeEmbedder, persist_dir: str):
         self.embedder = embedder
         self.persist_dir = persist_dir
+        self._reranker = RerankerService()
         self._client = chromadb.PersistentClient(
             path=persist_dir,
             settings=ChromaSettings(anonymized_telemetry=False),
@@ -152,6 +154,10 @@ class ResumeRAG:
         q_emb = self.embedder.embed(query)
         results = self._collection.query(query_embeddings=[q_emb], n_results=k)
         return self._format_results(results)
+
+    def _rerank(self, search_results: list[dict], jd_text: str, top_k: int = 5) -> list[dict]:
+        """对搜索结果按 JD 相关性进行 Cross-Encoder 重排。"""
+        return self._reranker.rerank_results(jd_text, search_results, top_k=top_k)
 
     def search_by_resume_id(self, resume_id: str, query: str, k: int = 3) -> list[dict]:
         """检索指定简历中与 query 相关的片段。"""

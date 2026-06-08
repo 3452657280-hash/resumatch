@@ -1,4 +1,5 @@
 """历史分析记录服务 —— 基于 SQLite 存储匹配/批量分析结果。"""
+from __future__ import annotations
 import json
 import sqlite3
 import uuid
@@ -117,6 +118,15 @@ class HistoryService:
         cursor = conn.execute("DELETE FROM history WHERE id = ?", (record_id,))
         conn.commit()
         return cursor.rowcount > 0
+
+    @staticmethod
+    def batch_delete(record_ids: list[str]) -> int:
+        """批量删除历史记录。"""
+        conn = _get_db()
+        placeholders = ",".join(["?" for _ in record_ids])
+        cursor = conn.execute(f"DELETE FROM history WHERE id IN ({placeholders})", record_ids)
+        conn.commit()
+        return cursor.rowcount
 
     @staticmethod
     def count() -> int:

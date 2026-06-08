@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ResuMatch - AI 简历匹配系统</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <style>:root {
   --primary: #6366f1;
   --primary-light: #818cf8;
@@ -66,8 +69,8 @@ a:hover { color:var(--primary-dark); }
 
 /* ═══════ Sidebar ═══════ */
 .sidebar {
-  width:220px; background:linear-gradient(180deg,#0c1222 0%,#1a2332 50%,#1e293b 100%); color:#fff;
-  display:flex; flex-direction:column; position:fixed; top:0; left:0; bottom:0; z-index:100;
+  width:220px; min-height:100vh; background:linear-gradient(180deg,#0c1222 0%,#1a2332 50%,#1e293b 100%); color:#fff;
+  display:flex; flex-direction:column; position:relative; flex-shrink:0;
   overflow-y:auto; box-shadow:4px 0 24px rgba(0,0,0,0.15);
 }
 .sidebar-brand {
@@ -81,19 +84,19 @@ a:hover { color:var(--primary-dark); }
 }
 .sidebar-brand .logo:hover { transform:scale(1.05) rotate(-3deg); }
 .sidebar-nav { flex:1; padding:6px 12px; }
-.sidebar-nav .nav-item {
+.sidebar-nav .nav-item { pointer-events:auto !important;
   display:flex; align-items:center; gap:12px; padding:12px 16px; border-radius:var(--radius-sm);
   cursor:pointer; transition:var(--transition); color:rgba(255,255,255,0.6); font-size:14px; font-weight:500; margin-bottom:2px;
   position:relative; overflow:hidden;
 }
-.sidebar-nav .nav-item::before {
+.sidebar-nav .nav-item::before { pointer-events:none;
   content:''; position:absolute; inset:0; border-radius:inherit;
   background:rgba(255,255,255,0.04); opacity:0; transition:var(--transition);
 }
 .sidebar-nav .nav-item:hover::before { opacity:1; }
 .sidebar-nav .nav-item:hover { color:#fff; }
 .sidebar-nav .nav-item.active { background:rgba(99,102,241,0.18); color:#fff; }
-.sidebar-nav .nav-item.active::after {
+.sidebar-nav .nav-item.active::after { pointer-events:none;
   content:''; position:absolute; left:0; top:50%; transform:translateY(-50%);
   width:3px; height:20px; background:var(--primary-light); border-radius:0 3px 3px 0;
 }
@@ -116,7 +119,7 @@ a:hover { color:var(--primary-dark); }
 .sidebar-footer .reset-btn:hover { background:rgba(239,68,68,0.22); color:#ef4444; }
 
 /* ═══════ Main Content ═══════ */
-.main { margin-left:220px; flex:1; display:flex; flex-direction:column; min-height:100vh; }
+.main { flex:1; display:flex; flex-direction:column; min-height:100vh; }
 .topbar {
   display:flex; align-items:center; justify-content:space-between;
   padding:14px 20px; background:rgba(255,255,255,0.8); backdrop-filter:blur(12px);
@@ -328,7 +331,7 @@ a:hover { color:var(--primary-dark); }
 .resume-item .id { font-size:11px; color:var(--text-light); margin-top:2px; }
 .resume-item .actions { display:flex; gap:8px; margin-top:4px; padding-top:10px; border-top:1px solid var(--border); }
 .resume-item .actions .btn { flex:1; text-align:center; font-size:12px; padding:6px 12px; }
-.history-item { background:#fff; border:1px solid var(--border); border-radius:var(--radius-sm); padding:16px 18px; margin-bottom:8px; transition:var(--transition); cursor:pointer; position:relative; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.history-checkbox { margin-right:4px; width:18px; height:18px; accent-color:var(--primary); cursor:pointer; flex-shrink:0; } .history-toolbar { display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap; } .history-toolbar .info { font-size:13px; color:var(--text-muted); } .history-item { background:#fff; border:1px solid var(--border); border-radius:var(--radius-sm); padding:16px 18px; margin-bottom:8px; transition:var(--transition); cursor:pointer; position:relative; display:flex; align-items:center; gap:12px; flex-wrap:wrap; } .history-item.batch-mode { cursor:default; }
 .history-item:hover { box-shadow:var(--shadow-md); border-color:var(--primary-light); transform:translateX(2px); }
 .history-type-badge { font-size:12px; padding:2px 10px; border-radius:6px; background:var(--primary-bg); color:var(--primary); font-weight:600; white-space:nowrap; }
 .history-type-badge.batch { background:#fef3c7; color:#92400e; }
@@ -339,9 +342,14 @@ a:hover { color:var(--primary-dark); }
 .history-mini-bars { display:flex; align-items:flex-end; gap:2px; height:24px; }
 .history-mini-bar { width:6px; border-radius:2px; transition:var(--transition); }
 .history-item:hover .history-mini-bar { opacity:0.8; }
+.history-jd-box { background:var(--bg-alt); padding:12px 16px; border-radius:var(--radius-sm); font-size:13px; line-height:1.7; margin-bottom:16px; white-space:pre-wrap; word-break:break-word; }
+.history-delete { cursor:pointer; font-size:16px; opacity:0.4; transition:var(--transition); padding:4px; }
+.history-delete:hover { opacity:1; }
 
 /* ═══════ History Modal ═══════ */
 .history-modal { position:fixed; inset:0; z-index:900; background:rgba(15,23,42,0.5); backdrop-filter:blur(4px); display:none; align-items:center; justify-content:center; }
+.history-modal-close { background:none; border:none; font-size:24px; cursor:pointer; color:var(--text-muted); padding:0 4px; line-height:1; margin-left:auto; transition:var(--transition); }
+.history-modal-close:hover { color:var(--text); }
 .history-modal-content { background:var(--card); border-radius:var(--radius-xl); width:90%; max-width:720px; max-height:85vh; overflow-y:auto; box-shadow:var(--shadow-xl); animation:slideUp 0.35s cubic-bezier(0.16,1,0.3,1); }
 .history-modal-header { padding:20px 28px; border-bottom:1px solid var(--border); font-size:16px; font-weight:700; display:flex; align-items:center; gap:8px; }
 .history-modal-body { padding:24px 28px; }
@@ -453,7 +461,6 @@ tr:hover td { background:var(--card-hover); }
 /* ═══════ Responsive ═══════ */
 @media (max-width:768px) {
   .sidebar { width:200px; }
-  .main { margin-left:0; }
   .topbar { padding:16px 20px; }
   .content { padding:20px; }
   .grid-2 { grid-template-columns:1fr; }
@@ -485,7 +492,10 @@ tr:hover td { background:var(--card-hover); }
       <div class="nav-item" data-page="about" onclick="showPage('about')"><span class="icon">ℹ️</span> 关于系统</div></nav>
     
   <div class="sidebar-footer">
-    <div class="version">⚡ ResuMatch v0.3.0 · Agent 驱动</div>
+    <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;">
+      <span style="font-size:10px;color:rgba(255,255,255,0.3);letter-spacing:0.8px;">RESUMATCH</span>
+      <span style="margin-left:auto;font-size:11px;color:rgba(255,255,255,0.25);">v1.0.0</span>
+    </div>
   </div>
   </aside>
   <main class="main">
@@ -514,14 +524,17 @@ tr:hover td { background:var(--card-hover); }
       </section>
       <section class="page" id="page-batch">
         <div class="card">
-          <div class="card-title">📊 批量匹配（所有简历）</div>
           <div class="form-group"><label>职位描述 (JD)</label><textarea id="batch-jd" rows="5" placeholder="粘贴职位描述..."></textarea></div>
           <button class="btn btn-primary" onclick="startBatchMatch()" id="batch-btn">▶ 匹配所有简历</button>
         </div>
         <div id="batch-results"></div>
       </section>
       <section class="page" id="page-history">
-        <div class="section-header"><span class="icon">📋</span> 分析历史</div>
+        <div class="history-toolbar">
+          <button class="btn btn-sm" id="batch-toggle-btn" onclick="toggleBatchMode()" style="font-size:12px;padding:6px 14px;">☑️ 批量选择</button>
+          <button class="btn btn-sm" id="batch-delete-btn" onclick="batchDelete()" style="display:none;font-size:12px;padding:6px 14px;background:var(--danger-bg);color:var(--danger);border-color:rgba(239,68,68,0.3);">🗑️ 删除选中 <span id="selected-count">0</span></button>
+          <span class="info" id="history-info"></span>
+        </div>
 <div class="history-card" id="history-list"></div>
         <div id="history-modal" class="history-modal" style="display:none;" onclick="if(event.target===this)closeHistoryModal()">
           <div class="history-modal-content">
@@ -532,11 +545,10 @@ tr:hover td { background:var(--card-hover); }
       </section>
       <section class="page" id="page-about">
         <div class="card">
-          <div class="card-title">ℹ️ 关于 ResuMatch</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
             <div>
               <h4 style="margin-bottom:12px;font-size:14px;">📖 系统简介</h4>
-              <p style="color:var(--text-muted);font-size:14px;line-height:1.8;">ResuMatch 是一个基于 <strong>自研 Agent 框架</strong> 的简历匹配 & 智能分析系统，采用通义千问大模型 + ChromaDB 向量检索技术栈，通过两阶段 Agent 流程（关键词提取 → 并行搜索 → LLM 评分 + 自我检查）对简历与职位描述进行深度匹配分析。</p>
+              <p style="color:var(--text-muted);font-size:14px;line-height:1.8;">ResuMatch 是一个基于 <strong>自研 Agent 框架</strong> 的简历匹配 & 智能分析系统，采用通义千问大模型 + ChromaDB 向量检索技术栈，通过四阶段 Agent 流程（JD 标签提取 → 多关键词向量检索 → RAG Rerank 重排 → LLM 综合评分 + 独立自检）对简历与职位描述进行深度匹配分析。</p>
             </div>
             <div>
               <h4 style="margin-bottom:12px;font-size:14px;">🔧 技术栈</h4>
@@ -554,9 +566,9 @@ tr:hover td { background:var(--card-hover); }
           </div>
           <hr style="border:none;border-top:1px solid var(--border);margin:16px 0;">
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;text-align:center;">
-            <div><div style="font-size:24px;font-weight:700;color:var(--primary);">2</div><div style="font-size:12px;color:var(--text-muted);">LLM 调用次数</div></div>
+            <div><div style="font-size:24px;font-weight:700;color:var(--primary);">3</div><div style="font-size:12px;color:var(--text-muted);">LLM 调用次数</div></div>
             <div><div style="font-size:24px;font-weight:700;color:var(--primary);">100%</div><div style="font-size:12px;color:var(--text-muted);">自研 Agent</div></div>
-            <div><div style="font-size:24px;font-weight:700;color:var(--primary);">v0.3.0</div><div style="font-size:12px;color:var(--text-muted);">当前版本</div></div>
+            <div><div style="font-size:24px;font-weight:700;color:var(--primary);">v1.0.0</div><div style="font-size:12px;color:var(--text-muted);">当前版本</div></div>
           </div>
         </div>
         <div class="card">
@@ -564,10 +576,10 @@ tr:hover td { background:var(--card-hover); }
           <p style="color:var(--text-muted);font-size:14px;line-height:1.8;">
             <strong>自研 Agent 框架</strong> 是指 ResuMatch 的 Agent 匹配器（<code>services/matcher.py</code>）完全自主实现，不依赖 LangChain、AutoGPT 等第三方 Agent 框架。<br><br>
             <strong>架构特点：</strong><br>
-            • <strong>两阶段流程</strong>：第一阶段用 LLM 从 JD 中提取关键词，第二阶段用这些关键词并行搜索 ChromaDB，再通过 LLM 综合评分 + 自我检查<br>
+            • <strong>四阶段流程</strong>：Phase 1 提取 JD 结构化标签 → Phase 2 分类并发搜索 → Phase 3 RAG Rerank 重排（LLM 驱动） → Phase 4 评分 + 独立 LLM 自检<br>
             • <strong>原生 ChromaDB</strong>：使用原生 Python 客户端操作向量数据库，中文友好文本分块器替代 LangChain 的 RecursiveCharacterTextSplitter<br>
             • <strong>轻量 LLM 接入</strong>：纯 httpx 调用 DashScope 的 OpenAI 兼容接口，无 SDK 依赖<br>
-            • <strong>每次匹配仅调 2 次 LLM</strong>，兼顾速度与质量
+            • <strong>每次匹配共调 3 次 LLM</strong>（提取 1 次 → 打分 1 次 → 自检 1 次），Rerank 由 RAG 模块独立完成
           </p>
         </div>
       </section>
@@ -698,19 +710,57 @@ function startMatch() {
   var btn = document.getElementById('match-btn');
   btn.disabled = true;
   btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:3px;"></div> 匹配中...';
-  document.getElementById('match-results').innerHTML = '<div class="card" style="margin-top:20px;"><div class="loading-state">'
+  var resultsEl = document.getElementById('match-results');
+  resultsEl.innerHTML = '<div class="card" style="margin-top:20px;"><div class="loading-state">'
     + '<div class="loading-icon"></div>'
     + '<div class="loading-text">AI 正在分析匹配...</div>'
-    + '<div class="loading-hint">Agent 正在读取简历、提取 JD 关键词、搜索文本块、评分自检</div>'
-    + '<div class="loading-steps">'
-    + '<div class="loading-step active"><div class="step-dot"></div><div class="step-label">🔍 提取关键词</div></div>'
-    + '<div class="loading-step"><div class="step-dot"></div><div class="step-label">📚 搜索文本块</div></div>'
-    + '<div class="loading-step"><div class="step-dot"></div><div class="step-label">⚖️ 评分自检</div></div>'
+    + '<div class="loading-hint" id="loading-hint">🔍 提取关键词...</div>'
+    + '<div class="loading-steps" id="loading-steps">'
+    + '<div class="loading-step active" data-phase="extract"><div class="step-dot"></div><div class="step-label">🔍 提取关键词</div></div>'
+    + '<div class="loading-step" data-phase="search"><div class="step-dot"></div><div class="step-label">📚 搜索文本块</div></div>'
+    + '<div class="loading-step" data-phase="rerank"><div class="step-dot"></div><div class="step-label">⚖️ Rerank 重排</div></div>'
+    + '<div class="loading-step" data-phase="score"><div class="step-dot"></div><div class="step-label">⚖️ 评分自检</div></div>'
     + '</div></div></div>';
+
+  // Animate steps progressively based on elapsed time
+  var phases = [
+    { phase: 'extract', label: '🔍 提取关键词...', time: 0 },
+    { phase: 'search', label: '📚 搜索文本块...', time: 3 },
+    { phase: 'rerank', label: '⚖️ Rerank 重排...', time: 8 },
+    { phase: 'score', label: '⚖️ 评分自检...', time: 13 },
+  ];
+  var startTime = Date.now();
+  var stepTimer = setInterval(function() {
+    var elapsed = (Date.now() - startTime) / 1000;
+    var steps = document.querySelectorAll('#loading-steps .loading-step');
+    var hint = document.getElementById('loading-hint');
+    var currentPhase = '';
+    for (var p = phases.length - 1; p >= 0; p--) {
+      if (elapsed >= phases[p].time) {
+        currentPhase = phases[p].phase;
+        if (hint) hint.textContent = phases[p].label;
+        break;
+      }
+    }
+    var found = false;
+    steps.forEach(function(s) {
+      var phase = s.getAttribute('data-phase');
+      if (phase === currentPhase) {
+        s.className = 'loading-step active';
+        found = true;
+      } else if (!found) {
+        s.className = 'loading-step done';
+      } else {
+        s.className = 'loading-step';
+      }
+    });
+  }, 500);
+
   fetch(API + '/match', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resume_id: resumeId, jd_text: jd }) }).then(function(r) {
     if (!r.ok) return r.json().then(function(e) { throw new Error(e.detail || '匹配失败'); });
     return r.json();
   }).then(function(data) {
+    clearInterval(stepTimer);
     var el = document.getElementById('match-results');
     el.innerHTML = '';
     for (var i = 0; i < data.results.length; i++) {
@@ -723,6 +773,7 @@ function startMatch() {
     btn.disabled = false;
     btn.innerHTML = '▶ 开始匹配';
   }).catch(function(e) {
+    clearInterval(stepTimer);
     toast('❌ ' + e.message, 'error');
     btn.disabled = false;
     btn.innerHTML = '▶ 开始匹配';
@@ -745,20 +796,57 @@ async function startBatchMatch() {
   btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:3px;"></div> 匹配中...';
   var res = await fetch(API + '/resumes');
   var resumes = await res.json();
-  document.getElementById('batch-results').innerHTML = '<div class="card" style="margin-top:20px;"><div class="loading-state">'
+  var el = document.getElementById('batch-results');
+  el.innerHTML = '<div class="card" style="margin-top:20px;"><div class="loading-state">'
     + '<div class="loading-icon"></div>'
     + '<div class="loading-text">AI 正在分析 ' + resumes.length + ' 份简历...</div>'
-    + '<div class="loading-hint">Agent 正在逐份提取关键词、搜索文本块、评分自检</div>'
-    + '<div class="loading-steps">'
-    + '<div class="loading-step active"><div class="step-dot"></div><div class="step-label">🔍 提取关键词</div></div>'
-    + '<div class="loading-step"><div class="step-dot"></div><div class="step-label">📚 搜索文本块</div></div>'
-    + '<div class="loading-step"><div class="step-dot"></div><div class="step-label">⚖️ 评分自检</div></div>'
+    + '<div class="loading-hint" id="batch-loading-hint">准备开始...</div>'
+    + '<div class="loading-steps" id="batch-loading-steps">'
+    + '<div class="loading-step active" data-phase="extract"><div class="step-dot"></div><div class="step-label">🔍 提取关键词</div></div>'
+    + '<div class="loading-step" data-phase="search"><div class="step-dot"></div><div class="step-label">📚 搜索文本块</div></div>'
+    + '<div class="loading-step" data-phase="rerank"><div class="step-dot"></div><div class="step-label">⚖️ Rerank 重排</div></div>'
+    + '<div class="loading-step" data-phase="score"><div class="step-dot"></div><div class="step-label">⚖️ 评分自检</div></div>'
     + '</div></div></div>';
+
+  // Animate steps
+  var phases = [
+    { phase: 'extract', label: '🔍 提取关键词...', time: 0 },
+    { phase: 'search', label: '📚 搜索文本块...', time: 5 },
+    { phase: 'rerank', label: '⚖️ Rerank 重排...', time: 12 },
+    { phase: 'score', label: '⚖️ 评分自检...', time: 18 },
+  ];
+  var startTime = Date.now();
+  var stepTimer = setInterval(function() {
+    var elapsed = (Date.now() - startTime) / 1000;
+    var steps = document.querySelectorAll('#batch-loading-steps .loading-step');
+    var hint = document.getElementById('batch-loading-hint');
+    var currentPhase = '';
+    for (var p = phases.length - 1; p >= 0; p--) {
+      if (elapsed >= phases[p].time) {
+        currentPhase = phases[p].phase;
+        if (hint) hint.textContent = phases[p].label;
+        break;
+      }
+    }
+    var found = false;
+    steps.forEach(function(s) {
+      var phase = s.getAttribute('data-phase');
+      if (phase === currentPhase) {
+        s.className = 'loading-step active';
+        found = true;
+      } else if (!found) {
+        s.className = 'loading-step done';
+      } else {
+        s.className = 'loading-step';
+      }
+    });
+  }, 500);
+
   try {
     var r = await fetch(API + '/match-all', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resume_id: '', jd_text: jd }) });
     if (!r.ok) { var e = await r.json(); throw new Error(e.detail || '匹配失败'); }
     var data = await r.json();
-    var el = document.getElementById('batch-results');
+    clearInterval(stepTimer);
     el.innerHTML = '<div class="card"><div class="card-title">📊 匹配结果排名 <span class="badge" style="background:var(--primary);color:#fff;">' + data.total_resumes + ' 份</span></div></div>';
     for (var i = 0; i < data.results.length; i++) {
       var div = document.createElement('div');
@@ -767,7 +855,10 @@ async function startBatchMatch() {
     }
     toast('✅ 批量匹配完成！', 'success');
     loadHistory();
-  } catch (e) { toast('❌ ' + e.message, 'error'); }
+  } catch (e) {
+    clearInterval(stepTimer);
+    toast('❌ ' + e.message, 'error');
+  }
   btn.disabled = false;
   btn.innerHTML = '▶ 匹配所有简历';
 }
@@ -870,6 +961,8 @@ function renderSkillSummary(results) {
 }
 
 // ── History ──
+var batchMode = false;
+var selectedIds = {};
 function loadHistory() {
   var el = document.getElementById('history-list');
   el.innerHTML = '<div class="loading" style="padding:40px;"><div class="spinner"></div></div>';
@@ -887,18 +980,68 @@ function loadHistory() {
       var jd = rec.jd_text || '';
       var jdShort = jd.length > 50 ? jd.substring(0, 50) + '...' : jd;
       var miniBars = renderMiniBars(rec.top_scores || [], rec.avg_score || 0, rec.score_count || 0);
-      html += '<div class="history-item" onclick="showHistoryDetail(&quot;' + rec.id + '&quot;)">'
+      var checked = selectedIds[rec.id] ? 'checked' : '';
+      var itemClass = batchMode ? 'history-item batch-mode' : 'history-item';
+      var clickHandler = batchMode ? 'event.stopPropagation()' : "showHistoryDetail('" + rec.id + "')";
+      html += '<div class="' + itemClass + '" onclick="' + clickHandler + '">'
+        + (batchMode ? '<input class="history-checkbox" type="checkbox" ' + checked + ' data-id="' + rec.id + '" onchange="toggleSelect(this)">' : '')
         + '<span class="' + badgeClass + '">' + label + '</span>'
         + '<span class="history-jd" title="' + escHtml(jd) + '">' + escHtml(jdShort) + '</span>'
         + miniBars
         + '<span class="history-time">' + fmtTime(rec.created_at) + '</span>'
-        + '<span class="history-delete" onclick="event.stopPropagation();delHistory(&quot;' + rec.id + '&quot;)">🗑️</span>'
+        + (!batchMode ? '<span class="history-delete" onclick="event.stopPropagation();delHistory(\'' + rec.id + '\')">🗑️</span>' : '')
         + '</div>';
     }
     el.innerHTML = html;
+    document.getElementById('history-info').textContent = '共 ' + data.total + ' 条记录';
   }).catch(function() {
     el.innerHTML = '<div class="empty-state" style="padding:60px 20px;"><div style="font-size:36px;margin-bottom:8px;">❌</div><p style="font-size:14px;">加载失败</p></div>';
   });
+}
+
+function toggleBatchMode() {
+  batchMode = !batchMode;
+  if (!batchMode) {
+    selectedIds = {};
+    document.getElementById('batch-delete-btn').style.display = 'none';
+    document.getElementById('batch-toggle-btn').textContent = '☑️ 批量选择';
+  } else {
+    document.getElementById('batch-toggle-btn').textContent = '❌ 取消选择';
+  }
+  loadHistory();
+}
+
+function toggleSelect(cb) {
+  var id = cb.getAttribute('data-id');
+  if (cb.checked) selectedIds[id] = true;
+  else delete selectedIds[id];
+  var count = Object.keys(selectedIds).length;
+  var btn = document.getElementById('batch-delete-btn');
+  var cntEl = document.getElementById('selected-count');
+  if (count > 0) {
+    btn.style.display = 'inline-block';
+    cntEl.textContent = count;
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+function batchDelete() {
+  var ids = Object.keys(selectedIds);
+  if (ids.length === 0) return;
+  if (!confirm('确定删除选中的 ' + ids.length + ' 条分析记录？')) return;
+  fetch(API + '/history/batch-delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(ids)
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    selectedIds = {};
+    batchMode = false;
+    document.getElementById('batch-delete-btn').style.display = 'none';
+    document.getElementById('batch-toggle-btn').textContent = '☑️ 批量选择';
+    loadHistory();
+    toast('已删除 ' + data.deleted + ' 条', 'success');
+  }).catch(function() { toast('批量删除失败', 'error'); });
 }
 
 function fmtTime(iso) {
@@ -1000,6 +1143,9 @@ async function fetchAIAnswer(q, body) {
 
 function getAIAnswer(q) {
   q = q.toLowerCase();
+  if ((q.indexOf('什么') >= 0 && (q.indexOf('能') >= 0 || q.indexOf('可以') >= 0)) || q.indexOf('功能') >= 0) {
+    return '我可以帮你做这些事：<br>1. <b>📤 上传简历</b> — 支持 PDF/DOCX 格式<br>2. <b>🔍 单份匹配</b> — 选一份简历填 JD，AI 自动分析打分<br>3. <b>📊 批量匹配</b> — 一次匹配所有简历，按分数排名<br>4. <b>📋 分析历史</b> — 查看以前的匹配记录<br>5. <b>💡 解答问题</b> — 系统使用、技术栈、评分规则等<br><br>想试试哪个？';
+  }
   if (q.indexOf('上传') >= 0 || q.indexOf('简历') >= 0 && q.indexOf('怎么') >= 0) {
     return '上传简历很简单：点击上传区的「📤 上传简历」页面，可以点击选择文件或直接拖拽 PDF/DOCX 文件到上传区域。系统会自动解析并向量化存入数据库。';
   }
@@ -1033,6 +1179,8 @@ document.addEventListener('DOMContentLoaded', function() {
   currentUser = localStorage.getItem('resumatch_user') || '默认用户';
 });
 loadResumes();
+console.log('✅ showPage:', typeof showPage);
+console.log('✅ nav-items:', document.querySelectorAll('.nav-item').length);
 </script>
 
 <div class="ai-bubble" id="ai-bubble">
@@ -1048,7 +1196,7 @@ loadResumes();
     <span style="margin-left:auto;font-size:16px;cursor:pointer;" onclick="toggleAI()">&times;</span>
   </div>
   <div class="ai-panel-body" id="ai-body">
-    <div class="ai-msg bot"><div class="bubble">你好！我是 AI 助手 <b>小 R</b> 🤖，可以帮你解答关于系统使用、匹配结果、技术栈等问题。</div></div>
+    <div class="ai-msg bot"><div class="bubble">👋 你好！我是 <b>小 R 🤖</b><br><br>我可以帮你：<br>• 📤 上传和管理简历<br>• 🔍 输入 JD 进行单份/批量匹配分析<br>• 📊 查看匹配报告和评分详情<br>• 📋 浏览历史分析记录<br>• 💡 解答系统使用问题<br><br>想了解什么？直接问我~</div></div>
   </div>
   <div class="ai-panel-input">
     <input type="text" id="ai-input" placeholder="输入问题..." onkeydown="if(event.key==='Enter')sendAI()">

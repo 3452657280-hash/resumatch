@@ -5,8 +5,8 @@
 ## 功能
 
 - 📤 **简历上传 & 解析** — 支持 PDF/DOCX，自动分块（500字/块，100字重叠）并向量化存入 ChromaDB
-- 🔍 **Agent 单份匹配** — JD 关键词提取 → 向量检索 → Rerank 重排 → LLM 综合评分 + 二次审查(self_check)
-- 📊 **批量匹配** — 所有简历统一排名，带排名徽标，快速筛选最佳候选人
+- 🔍 **Agent 单份匹配** — JD 关键词提取 → 向量检索 → Rerank 重排 → LLM 综合评分 + 独立二次审查
+- 📊 **批量匹配** — 所有简历统一排名，快速筛选最佳候选人
 - 🤖 **AI 小助手** — 侧边栏悬浮智能问答助手
 - 📱 **移动端适配** — 侧边栏折叠，手机可用
 
@@ -21,6 +21,7 @@
 | Embedding | 通义千问 text-embedding-v3 |
 | 简历解析 | PyMuPDF + python-docx，LLM 验证解析质量 |
 | 文本分块 | 中文友好分块器（chunk_size=500, overlap=100） |
+| Rerank | RAG 模块重排序（LLM 辅助检索结果，保留 Top-5） |
 | 前端 | 纯 HTML/CSS/JS 单页面（无框架） |
 | 历史存储 | SQLite |
 | 部署 | Docker / Docker Compose |
@@ -65,25 +66,26 @@ docker compose up --build
 ## 项目结构
 
 ```
-resumatch/
+ResuMatch/
 ├── frontend/
-│   └── index.html       # 前端单页面（HTML + CSS + JS）
+│   └── index.html           # 前端单页面（HTML + CSS + JS）
 ├── backend/
-│   ├── main.py           # FastAPI 入口
-│   └── routes.py         # API 路由
+│   ├── main.py              # FastAPI 入口 + 全局异常处理
+│   └── routes.py            # API 路由
 ├── services/
-│   ├── matcher.py        # Agent 匹配器（JD提取 → 检索 → Rerank → 评分 + self_check）
-│   ├── rag.py            # ChromaDB 向量检索引擎
-│   ├── parser.py         # 简历解析 (PDF/DOCX) + LLM 质量验证
-│   └── history.py        # SQLite 历史记录
+│   ├── matcher.py           # Agent 匹配器（4 阶段：提取→搜索→Rerank→打分+自检）
+│   ├── rag.py               # ChromaDB 向量检索引擎（含 Rerank）
+│   ├── parser.py            # 简历解析 (PDF/DOCX) + LLM 质量验证
+│   └── history.py           # SQLite 历史记录
 ├── app/
-│   ├── config.py         # 配置、LLM/Embedding 客户端
-│   └── models.py         # Pydantic 数据模型
-├── data/                 # 数据目录（上传文件 / Chroma 持久化 / SQLite）
+│   ├── config.py            # 配置、LLM/Embedding 客户端（带重试和异常处理）
+│   └── models.py            # Pydantic 数据模型
+├── data/                    # 数据目录（上传文件 / Chroma 持久化 / SQLite）
+├── AGENTS.md                # 开发者指南
 ├── Dockerfile
 ├── docker-compose.yml
-├── pyproject.toml        # 项目配置（Python 3.11+）
-└── requirements.txt
+├── requirements.txt
+└── .env                     # API Key 配置（不上传 git）
 ```
 
 ## API 接口（部分）
@@ -99,6 +101,29 @@ resumatch/
 | GET/DELETE | `/api/v1/history/{id}` | 查看/删除历史详情 |
 | GET | `/health` | 健康检查 |
 
+## Agent 匹配流程
+
+```
+用户上传简历发送请求到 FastAPI
+  → FastAPI 调用解析简历函数解析，将 PDF 内容转为文字
+  → 调用 RAG 按 500/100 分块
+  → embedding 向量化
+  → 存到 ChromaDB
+  → 结果返回前端
+
+用户点击匹配上传 JD，发送请求到 FastAPI
+  → FastAPI 调用 LLM 将 JD 进行结构化标签提取
+  → 遍历每个 value，作为搜索词
+  → embedding 转向量
+  → 调用 RAG 在 ChromaDB 检索，优先在相同标签搜，不够再搜全文
+  → 返回相关文本块
+  → RAG rerank 出最相关的块交给 LLM
+  → LLM 将 JD 和文本块总结
+  → LLM 按权重打分
+  → LLM 自检（独立调 LLM 复核，发现问题调分）
+  → FastAPI 将结果返回前端生成图表
+```
+
 ## License
 
 MIT
@@ -109,4 +134,4 @@ MIT
 - Gitee:  https://gitee.com/wangyu-bo/resumatch
 
 ---
-> 自研 Agent 框架：两阶段 JD 关键词提取 → ChromaDB 向量检索 → Rerank 重排 → LLM 加权评分 + 二次审查，全程纯 httpx 实现，无第三方 Agent 框架依赖。
+> 自研 Agent 框架，无第三方 Agent 框架依赖。全程纯 httpx 实现 LLM 调用，ChromaDB 原生客户端实现向量检索。

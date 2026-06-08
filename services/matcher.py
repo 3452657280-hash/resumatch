@@ -1,4 +1,4 @@
-"""Agent 简历匹配服务 —— 三阶段式：关键词提取 → 并发搜索 → Rerank → 评分 + 自检。"""
+"""Agent 简历匹配服务 —— 四阶段：JD 标签提取 → 并发搜索 → RAG Rerank → LLM 评分 + 独立自检。"""
 import json
 import re
 
@@ -6,25 +6,6 @@ from app.config import DashScopeLLM
 from app.models import MatchResult, SkillGap
 from services.rag import ResumeRAG
 
-
-RERANK_PROMPT = """你是一个简历片段重排序专家。给定一个职位描述（JD）和多个简历文本片段，请评估每个片段与 JD 的相关性。
-
-请直接输出 JSON 数组，不要包含其他文字：
-[
-  {"index": 0, "relevance_score": 0-10的整数, "reason": "简短理由"},
-  {"index": 1, "relevance_score": 0-10的整数, "reason": "简短理由"},
-  ...
-]
-
-评分标准：
-- 9-10: 直接命中 JD 中的核心技能或经验要求
-- 7-8: 与 JD 要求高度相关，但不完全匹配
-- 5-6: 部分相关，涉及 JD 中的某些方面
-- 3-4: 弱相关，仅有少量关联
-- 1-2: 几乎不相关
-- 0: 完全不相关或无关内容
-
-注意：诚实评分，不要给所有片段都打高分。"""
 
 STRUCTURED_KEYWORD_PROMPT = """你是一位简历筛选 Agent。你的任务是分析职位描述（JD），提取出评估候选人时最需要关注的关键词，并按类别分类。
 
@@ -76,7 +57,6 @@ SCORE_PROMPT = """你是一位资深的简历筛选专家和招聘顾问。你�
     {"skill": "技能名", "status": "matched|missing|weak", "suggestion": "提升建议"}
   ],
   "suggestions": ["改进建议1", "改进建议2", ...],
-  "self_check": "对这个评分的自我评估：硬性条件是否都已覆盖？有无矛盾或遗漏？如果发现问题请降低评分。"
 }
 
 评分维度：
@@ -85,18 +65,46 @@ SCORE_PROMPT = """你是一位资深的简历筛选专家和招聘顾问。你�
 - 项目/成果质量（20%）
 - 软技能与文化适配（10%）— 软性条件
 
-注意：请诚实评分。如果简历中明显缺少 JD 要求的硬性条件，不要给高分。"""
+⚠️ 重要规则（必须遵守）：
+1. **用项目经验证明能力** — 如果候选人做过 AI 智能体、RAG 系统、大模型部署等项目，就应视为具备大模型 API 使用经验，即使简历中没有写出"OpenAI""DeepSeek"等具体名词。项目本身就是最好的证据。
+2. **不要写"没有直接提到XX"这种劣势** — 劣势必须是有实际业务影响的能力缺失。如果简历通过项目经历展示了相关能力，就不算劣势。
+3. **skill_gaps 只列真实缺失** — 只有在简历的任何项目中都找不到相关实践证据时，才标记为 missing 或 weak。
+4. **客观诚实** — 如果简历内容满足 JD 要求就给高分，不故意压分。"""
 
+
+SELF_CHECK_PROMPT = """你是一位严格的简历评分审核官。你的任务是对上一轮简历匹配的评分结果进行复核。
+
+请对比 JD 要求的硬性条件与简历实际内容，逐项检查：
+
+1. JD 要求的每个硬性条件，简历是否真的具备？如果存在缺失但评分偏高，**必须建议降分**。
+2. 评分是否过高或过低？如果发现不合理，请调整到合理的分数。
+3. 是否存在 LLM 幻觉——简历中没有提到的技能，却被标记为 "matched"？
+
+请输出以下 JSON：
+
+{
+  "pass": true/false,
+  "adjusted_score": 0-100的整数（如果原分合理则保持不变）,
+  "issues": ["发现的问题1", "发现的问题2", ...],
+  "final_verdict": "最终审核结论（一句话）"
+}
+
+注意：
+- 如果发现硬性条件缺失但原评分较高，请诚实降分。
+- 如果原评分合理，就保持分数不变，pass 为 true。
+- 你是最终审核官，你的分数是最终分数。
+- **不要编造没有意义的劣势**。候选人通过项目经验展示了相关能力，就应视为具备该能力。
+- **特别提醒**：做过 AI 智能体、RAG、大模型部署等项目的候选人，100% 具备大模型 API 使用经验，不得将其列为缺失项。"""
 
 class AgentMatcher:
-    """Agent 简历匹配器：三阶段式 —— 关键词提取 → 并发搜索 → Rerank → 评分。"""
+    """Agent 简历匹配器：四阶段 —— JD 标签提取 → 并发搜索 → RAG Rerank → LLM 评分 + 独立自检。"""
 
     def __init__(self, llm: DashScopeLLM, rag: ResumeRAG):
         self.llm = llm
         self.rag = rag
 
     def match_single(self, resume_id: str, filename: str, jd_text: str) -> MatchResult:
-        """对一份简历进行三阶段 Agent 匹配分析。"""
+        """对一份简历进行四阶段 Agent 匹配分析。"""
         resume_text = self.rag.get_resume_text(resume_id)
         if not resume_text or not resume_text.strip():
             return MatchResult(
@@ -105,25 +113,137 @@ class AgentMatcher:
                 summary="未能在向量库中找到该简历的有效文本，请确认简历已成功上传并解析。",
             )
 
-        # ── Phase 1: 提取结构化关键词（按硬性条件 / 软性条件 / 业务领域分类）──
-        structured_keywords = self._extract_keywords(jd_text)
+        # ── Phase 1: 提取结构化关键词 ──
+        try:
+            structured_keywords = self._extract_keywords(jd_text)
+        except RuntimeError as e:
+            return MatchResult(
+                resume_id=resume_id, resume_filename=filename,
+                overall_score=0,
+                summary=f"JD 关键词提取失败：{e}",
+            )
 
         # ── Phase 2: 分类并发搜索 ──
-        search_results = self._search_all_keywords(resume_id, structured_keywords)
+        try:
+            search_results = self._search_all_keywords(resume_id, structured_keywords)
+        except RuntimeError as e:
+            return MatchResult(
+                resume_id=resume_id, resume_filename=filename,
+                overall_score=0,
+                summary=f"简历检索失败：{e}",
+            )
 
-        # ── Phase 2.5: Rerank 重排序 ──
-        reranked_results = self._rerank(jd_text, search_results)
+        if not search_results:
+            return MatchResult(
+                resume_id=resume_id, resume_filename=filename,
+                overall_score=0,
+                summary="在向量库中未找到与 JD 相关的简历内容，请确认简历已正确解析并包含相关经验。",
+            )
 
-        # ── Phase 3: 评分 + 自检（传入结构化关键词供参考）──
-        return self._score(resume_id, filename, jd_text, reranked_results, structured_keywords)
+        # ── Phase 2.5: Rerank 重排序（由 RAG 完成） ──
+        try:
+            reranked_results = self.rag._rerank(search_results, jd_text, top_k=5)
+        except RuntimeError:
+            # Rerank 失败时降级，直接用原始搜索结果
+            reranked_results = search_results[:5]
+
+        # ── Phase 3: 评分 ──
+        try:
+            result = self._score(resume_id, filename, jd_text, reranked_results, structured_keywords)
+        except RuntimeError as e:
+            return MatchResult(
+                resume_id=resume_id, resume_filename=filename,
+                overall_score=0,
+                summary=f"简历评分失败：{e}",
+            )
+
+        # ── Phase 4: 二次审查（独立 LLM 复核） ──
+        try:
+            result = self._self_check(resume_id, filename, jd_text, structured_keywords, result)
+        except RuntimeError:
+            # 自检失败降级，使用原评分结果
+            pass
+
+        return result
+
+    def match_single_stream(self, resume_id: str, filename: str, jd_text: str):
+        """对一份简历进行匹配分析，以生成器方式逐阶段推送进度。
+
+        Yields:
+            dict: {"type": "progress", "phase": str, "current": int, "total": int, "label": str}
+            或 {"type": "result", "data": dict} 或 {"type": "error", "message": str}
+        """
+        resume_text = self.rag.get_resume_text(resume_id)
+        if not resume_text or not resume_text.strip():
+            yield {"type": "result", "data": MatchResult(
+                resume_id=resume_id, resume_filename=filename,
+                overall_score=0,
+                summary="未能在向量库中找到该简历的有效文本，请确认简历已成功上传并解析。",
+            ).model_dump()}
+            return
+
+        phases = [
+            ("extract", "🔍 提取关键词"),
+            ("search", "📚 搜索文本块"),
+            ("rerank", "⚖️ Rerank 重排"),
+            ("score", "⚖️ 评分自检"),
+        ]
+        total = len(phases)
+
+        # ── Phase 1: 提取结构化关键词 ──
+        yield {"type": "progress", "phase": "extract", "current": 1, "total": total, "label": "🔍 提取关键词"}
+        try:
+            structured_keywords = self._extract_keywords(jd_text)
+        except RuntimeError as e:
+            yield {"type": "error", "message": f"JD 关键词提取失败：{e}"}
+            return
+
+        # ── Phase 2: 分类并发搜索 ──
+        yield {"type": "progress", "phase": "search", "current": 2, "total": total, "label": "📚 搜索文本块"}
+        try:
+            search_results = self._search_all_keywords(resume_id, structured_keywords)
+        except RuntimeError as e:
+            yield {"type": "error", "message": f"简历检索失败：{e}"}
+            return
+
+        if not search_results:
+            yield {"type": "result", "data": MatchResult(
+                resume_id=resume_id, resume_filename=filename,
+                overall_score=0,
+                summary="在向量库中未找到与 JD 相关的简历内容。",
+            ).model_dump()}
+            return
+
+        # ── Phase 2.5: Rerank ──
+        yield {"type": "progress", "phase": "rerank", "current": 3, "total": total, "label": "⚖️ Rerank 重排"}
+        try:
+            reranked_results = self.rag._rerank(search_results, jd_text, top_k=5)
+        except RuntimeError:
+            reranked_results = search_results[:5]
+
+        # ── Phase 3: 评分 ──
+        yield {"type": "progress", "phase": "score", "current": 4, "total": total, "label": "⚖️ 评分自检"}
+        try:
+            result = self._score(resume_id, filename, jd_text, reranked_results, structured_keywords)
+        except RuntimeError as e:
+            yield {"type": "error", "message": f"简历评分失败：{e}"}
+            return
+
+        # ── Phase 4: 二次审查 ──
+        try:
+            result = self._self_check(resume_id, filename, jd_text, structured_keywords, result)
+        except RuntimeError:
+            pass
+
+        yield {"type": "result", "data": result.model_dump()}
 
     def _extract_keywords(self, jd_text: str) -> dict:
         """调用 LLM 提取 JD 结构化关键词，按「硬性条件/软性条件/业务领域」分类 + 段落建议。"""
-        response = self.llm.invoke([
-            {"role": "system", "content": STRUCTURED_KEYWORD_PROMPT},
-            {"role": "user", "content": f"职位描述：\n{jd_text}"},
-        ])
         try:
+            response = self.llm.invoke([
+                {"role": "system", "content": STRUCTURED_KEYWORD_PROMPT},
+                {"role": "user", "content": f"职位描述：\n{jd_text}"},
+            ])
             keywords = json.loads(response.strip())
             if isinstance(keywords, dict):
                 for cat in ["硬性条件", "软性条件", "业务领域"]:
@@ -132,7 +252,7 @@ class AgentMatcher:
                 if "段落建议" not in keywords:
                     keywords["段落建议"] = {}
                 return keywords
-        except (json.JSONDecodeError, TypeError):
+        except (json.JSONDecodeError, TypeError, RuntimeError):
             pass
         # Fallback
         return {"硬性条件": [jd_text[:50]], "软性条件": [], "业务领域": [], "段落建议": {}}
@@ -189,55 +309,20 @@ class AgentMatcher:
 
         return results
 
-    def _rerank(self, jd_text: str, search_results: list[dict]) -> list[dict]:
-        """用 LLM 对检索结果按与 JD 的相关性进行重排序，保留 Top-5。"""
-        if len(search_results) <= 3:
-            return search_results  # 太少不需要 rerank
 
-        # 构建重排序 Prompt
-        items = []
-        for i, r in enumerate(search_results):
-            items.append(f"[{i}] 关键词: {r['keyword']}\n内容: {r['content']}")
-
-        items_text = "\n\n---\n\n".join(items)
-        user_message = (
-            f"## 职位描述（JD）\n{jd_text}\n\n"
-            f"## 待排序的简历片段\n{items_text}\n\n"
-            f"请评估每个片段与 JD 的相关性并给出评分。"
-        )
-
-        response = self.llm.invoke([
-            {"role": "system", "content": RERANK_PROMPT},
-            {"role": "user", "content": user_message},
-        ])
-
-        try:
-            scores = json.loads(response.strip())
-            if isinstance(scores, list) and len(scores) >= 2:
-                # 按相关性得分降序排列
-                scores.sort(key=lambda x: x.get("relevance_score", 0), reverse=True)
-                # 取 Top-5
-                top_indices = [s["index"] for s in scores[:5] if 0 <= s["index"] < len(search_results)]
-                reranked = [search_results[i] for i in top_indices]
-                return reranked if reranked else search_results[:5]
-        except (json.JSONDecodeError, TypeError, IndexError, KeyError):
-            pass
-
-        # Fallback: 直接取前 5 个
-        return search_results[:5]
 
     def _score(self, resume_id: str, filename: str, jd_text: str, search_results: list[dict], structured_keywords: dict | None = None) -> MatchResult:
         """基于搜索到的简历内容进行评分（含结构化关键词分类信息）。"""
         context_parts = []
         for r in search_results:
-            tag = f"[{r['category']}] " if r.get('category') else ""
+            tag = f"[{r.get('category', '')}] " if r.get('category') else ""
             skill_tag = " [技能直接命中]" if r.get('direct_skill_match') else ""
-            section_tag = f" (来自: {r['section']})" if r.get('section') else ""
-            context_parts.append(f"{tag}{r['content']}{skill_tag}{section_tag}")
+            section_tag = f" (来自: {r.get('section', '')})" if r.get('section') else ""
+            content_preview = (r.get('content') or '')[:500]
+            context_parts.append(f"{tag}{content_preview}{skill_tag}{section_tag}")
 
         resume_context = "\n\n---\n\n".join(context_parts) if context_parts else "（未找到相关简历内容）"
 
-        # 构建关键词分类摘要
         kw_parts = []
         if structured_keywords:
             if structured_keywords.get("硬性条件"):
@@ -255,17 +340,17 @@ class AgentMatcher:
             f"请根据 JD 对该候选人进行匹配分析，特别注意硬性条件的匹配程度。"
         )
 
-        response = self.llm.invoke([
-            {"role": "system", "content": SCORE_PROMPT},
-            {"role": "user", "content": user_message},
-        ])
+        try:
+            response = self.llm.invoke([
+                {"role": "system", "content": SCORE_PROMPT},
+                {"role": "user", "content": user_message},
+            ])
+        except RuntimeError as e:
+            raise RuntimeError(f"评分 LLM 调用失败: {e}")
 
         parsed = self._parse_json(response)
         if parsed is None:
-            return MatchResult(
-                resume_id=resume_id, resume_filename=filename,
-                overall_score=0, summary="分析结果解析失败",
-            )
+            raise RuntimeError("评分 LLM 返回格式异常，无法解析评分结果")
 
         skill_gaps = []
         for sg in parsed.get("skill_gaps") or []:
@@ -282,6 +367,60 @@ class AgentMatcher:
             skill_gaps=skill_gaps,
             suggestions=parsed.get("suggestions") or [],
         )
+
+    def _self_check(self, resume_id: str, filename: str, jd_text: str, structured_keywords: dict | None, initial_result: MatchResult) -> MatchResult:
+        """独立调 LLM 对评分结果进行二次审查，如有问题则调整分数。"""
+        keywords_info = ""
+        if structured_keywords:
+            for cat in ("硬性条件", "软性条件", "业务领域"):
+                vals = structured_keywords.get(cat, [])
+                if vals:
+                    keywords_info += f"- {cat}: {', '.join(vals)}\n"
+
+        user_message = (
+            f"## 职位描述（JD）\n{jd_text}\n\n"
+            f"## 提取的关键词\n{keywords_info}\n\n"
+            f"## 初审评分结果\n"
+            f"总分: {initial_result.overall_score}\n"
+            f"总结: {initial_result.summary}\n"
+            f"优势: {', '.join(initial_result.strengths)}\n"
+            f"劣势: {', '.join(initial_result.weaknesses)}\n"
+            f"技能匹配: {json.dumps([s.model_dump() for s in initial_result.skill_gaps], ensure_ascii=False)}\n\n"
+            f"请复核上述评分是否合理，如有问题请调整。"
+        )
+
+        try:
+            response = self.llm.invoke([
+                {"role": "system", "content": SELF_CHECK_PROMPT},
+                {"role": "user", "content": user_message},
+            ])
+        except RuntimeError:
+            # 自检 LLM 调用失败，降级返回原结果
+            return initial_result
+
+        try:
+            check_result = json.loads(response.strip())
+            adjusted_score = check_result.get("adjusted_score", initial_result.overall_score)
+            issues = check_result.get("issues", [])
+
+            if adjusted_score != initial_result.overall_score or not check_result.get("pass", True):
+                original_summary = initial_result.summary
+                issues_text = "；".join(issues) if issues else "评分已调整"
+                new_summary = f"{original_summary}（经二次审查：{check_result.get('final_verdict', issues_text)}）"
+                return MatchResult(
+                    resume_id=resume_id,
+                    resume_filename=filename,
+                    overall_score=adjusted_score,
+                    summary=new_summary,
+                    strengths=initial_result.strengths,
+                    weaknesses=initial_result.weaknesses,
+                    skill_gaps=initial_result.skill_gaps,
+                    suggestions=initial_result.suggestions,
+                )
+        except (json.JSONDecodeError, TypeError, KeyError):
+            pass
+
+        return initial_result
 
     def _parse_json(self, text: str) -> dict | None:
         """从 LLM 输出中提取并解析 JSON。"""
