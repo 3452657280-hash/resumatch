@@ -96,6 +96,16 @@ SELF_CHECK_PROMPT = """你是一位严格的简历评分审核官。你的任务
 - **不要编造没有意义的劣势**。候选人通过项目经验展示了相关能力，就应视为具备该能力。
 - **特别提醒**：做过 AI 智能体、RAG、大模型部署等项目的候选人，100% 具备大模型 API 使用经验，不得将其列为缺失项。"""
 
+
+def _group_by_keyword(items: list[dict]) -> list[list[dict]]:
+    """将搜索结果按 keyword 分组。"""
+    groups = {}
+    for item in items:
+        kw = item.get("keyword", "")
+        groups.setdefault(kw, []).append(item)
+    return list(groups.values())
+
+
 class AgentMatcher:
     """Agent 简历匹配器：四阶段 —— JD 标签提取 → 并发搜索 → RAG Rerank → LLM 评分 + 独立自检。"""
 
@@ -125,7 +135,7 @@ class AgentMatcher:
 
         # ── Phase 2: 分类并发搜索 ──
         try:
-            search_results = self._search_all_keywords(resume_id, structured_keywords)
+            grouped_results = self._search_all_keywords(resume_id, structured_keywords)
         except RuntimeError as e:
             return MatchResult(
                 resume_id=resume_id, resume_filename=filename,
@@ -133,19 +143,44 @@ class AgentMatcher:
                 summary=f"简历检索失败：{e}",
             )
 
-        if not search_results:
+        all_results = grouped_results["硬性条件"] + grouped_results["软性条件"] + grouped_results["业务领域"]
+        if not all_results:
             return MatchResult(
                 resume_id=resume_id, resume_filename=filename,
                 overall_score=0,
                 summary="在向量库中未找到与 JD 相关的简历内容，请确认简历已正确解析并包含相关经验。",
             )
 
-        # ── Phase 2.5: Rerank 重排序（由 RAG 完成） ──
+        # ── Phase 2.5: 硬性条件不做重排，全部保留；其他做重排 ──
+        #  硬性条件是匹配核心，每个关键词搜到的结果直接保留 top 2，不做重排（避免误杀证据）
+        #  业务领域和软性条件各取 top 1
+        reranked_results = []
         try:
-            reranked_results = self.rag._rerank(search_results, jd_text, top_k=5)
+            # 硬性条件：不做重排，直接取每个关键词的前 2 条
+            for kw_items in _group_by_keyword(grouped_results.get("硬性条件", [])):
+                reranked_results.extend(kw_items[:2])
+
+            # 业务领域：重排选 top 1
+            for kw_items in _group_by_keyword(grouped_results.get("业务领域", [])):
+                if len(kw_items) <= 1:
+                    reranked_results.extend(kw_items)
+                else:
+                    reranked_results.extend(self.rag._rerank(kw_items, jd_text, top_k=1))
+
+            # 软性条件：重排选 top 1
+            for kw_items in _group_by_keyword(grouped_results.get("软性条件", [])):
+                if len(kw_items) <= 1:
+                    reranked_results.extend(kw_items)
+                else:
+                    reranked_results.extend(self.rag._rerank(kw_items, jd_text, top_k=1))
+
+            # 最多 15 条，防止 LLM prompt 过长
+            if len(reranked_results) > 15:
+                reranked_results = reranked_results[:15]
         except RuntimeError:
-            # Rerank 失败时降级，直接用原始搜索结果
-            reranked_results = search_results[:5]
+            reranked_results = []
+            for cat in ("硬性条件", "业务领域", "软性条件"):
+                reranked_results.extend(grouped_results.get(cat, [])[:3])
 
         # ── Phase 3: 评分 ──
         try:
@@ -201,12 +236,13 @@ class AgentMatcher:
         # ── Phase 2: 分类并发搜索 ──
         yield {"type": "progress", "phase": "search", "current": 2, "total": total, "label": "📚 搜索文本块"}
         try:
-            search_results = self._search_all_keywords(resume_id, structured_keywords)
+            grouped_results = self._search_all_keywords(resume_id, structured_keywords)
         except RuntimeError as e:
             yield {"type": "error", "message": f"简历检索失败：{e}"}
             return
 
-        if not search_results:
+        all_results = grouped_results["硬性条件"] + grouped_results["软性条件"] + grouped_results["业务领域"]
+        if not all_results:
             yield {"type": "result", "data": MatchResult(
                 resume_id=resume_id, resume_filename=filename,
                 overall_score=0,
@@ -214,12 +250,28 @@ class AgentMatcher:
             ).model_dump()}
             return
 
-        # ── Phase 2.5: Rerank ──
+        # ── Phase 2.5: Rerank（按关键词分别重排，保证每个条件都有证据）──
         yield {"type": "progress", "phase": "rerank", "current": 3, "total": total, "label": "⚖️ Rerank 重排"}
+        reranked_results = []
         try:
-            reranked_results = self.rag._rerank(search_results, jd_text, top_k=5)
+            for kw_items in _group_by_keyword(grouped_results.get("硬性条件", [])):
+                reranked_results.extend(kw_items[:2])
+            for kw_items in _group_by_keyword(grouped_results.get("业务领域", [])):
+                if len(kw_items) <= 1:
+                    reranked_results.extend(kw_items)
+                else:
+                    reranked_results.extend(self.rag._rerank(kw_items, jd_text, top_k=1))
+            for kw_items in _group_by_keyword(grouped_results.get("软性条件", [])):
+                if len(kw_items) <= 1:
+                    reranked_results.extend(kw_items)
+                else:
+                    reranked_results.extend(self.rag._rerank(kw_items, jd_text, top_k=1))
+            if len(reranked_results) > 15:
+                reranked_results = reranked_results[:15]
         except RuntimeError:
-            reranked_results = search_results[:5]
+            reranked_results = []
+            for cat in ("硬性条件", "业务领域", "软性条件"):
+                reranked_results.extend(grouped_results.get(cat, [])[:3])
 
         # ── Phase 3: 评分 ──
         yield {"type": "progress", "phase": "score", "current": 4, "total": total, "label": "⚖️ 评分自检"}
@@ -257,15 +309,10 @@ class AgentMatcher:
         # Fallback
         return {"硬性条件": [jd_text[:50]], "软性条件": [], "业务领域": [], "段落建议": {}}
 
-    def _search_all_keywords(self, resume_id: str, structured_keywords: dict) -> list[dict]:
-        """对所有关键词分类搜索。
-
-        两步走：
-        1. 先用段落建议在指定段落内搜（利用 section 元数据过滤）
-        2. 如果结果不够 k 个，再搜全文补满
-        """
+    def _search_all_keywords(self, resume_id: str, structured_keywords: dict) -> dict[str, list[dict]]:
+        """对所有关键词分类搜索，返回按类别分组的结果。"""
         seen = set()
-        results = []
+        results = {"硬性条件": [], "软性条件": [], "业务领域": []}
         section_hints = structured_keywords.get("段落建议", {})
 
         def add_result(d, keyword, category):
@@ -274,7 +321,7 @@ class AgentMatcher:
                 seen.add(content)
                 skills_meta = d["metadata"].get("skills", "")
                 direct_hit = keyword.lower() in skills_meta.lower() if skills_meta else False
-                results.append({
+                results[cat].append({
                     "keyword": keyword,
                     "category": category,
                     "content": content,

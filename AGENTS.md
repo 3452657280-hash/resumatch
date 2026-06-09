@@ -11,8 +11,9 @@ ResuMatch/                 # 项目根目录
 │   ├── main.py            # FastAPI 入口 + 全局异常处理
 │   └── routes.py          # API 路由
 ├── services/              # 核心业务逻辑
-│   ├── matcher.py         # Agent 匹配器（4 阶段：提取→搜索→Rerank→打分+自检）
-│   ├── rag.py             # ChromaDB 向量检索引擎（含 Rerank）
+│   ├── matcher.py         # Agent 匹配器（提取→搜索→Rerank→打分+自检）
+│   ├── rag.py             # ChromaDB 向量检索引擎
+│   ├── reranker.py        # Cross-Encoder 重排服务
 │   ├── parser.py          # 简历解析 (PDF/DOCX) + LLM 质量验证
 │   └── history.py         # SQLite 历史记录
 ├── frontend/
@@ -41,17 +42,17 @@ ResuMatch/                 # 项目根目录
 
 1. **JD 关键词提取** — LLM 提取结构化标签（硬性条件/软性条件/业务领域/段落建议）
 2. **分类并发搜索** — 遍历每个标签，按段落建议优先搜，不够搜全文补齐
-3. **Rerank 重排** — RAG 模块用 LLM 对搜索结果重排序，保留 Top-5
+3. **Rerank 重排** — Cross-Encoder（BAAI/bge-reranker-v2-m3）按关键词分组重排，硬性条件不走重排直接保留
 4. **评分 + 自检** — LLM 按权重综合打分 → 独立调 LLM 二次审查(self_check)，发现问题调分
 
-全程调 3 次 LLM（提取 1 次 → 打分 1 次 → 自检 1 次），Rerank 由 RAG 模块独立完成。纯 httpx 实现。
+全程调 2 次 LLM（提取关键词 1 次 → 评分+自检 1 次），重排由本地 Cross-Encoder 完成，零 API 费用。纯 httpx 实现。
 
 ### RAG 引擎（services/rag.py）
 
 - 原生 ChromaDB 客户端，无 LangChain 依赖
 - 中文友好文本分块器（chunk_size=500, overlap=100）
 - 元数据包含 resume_id、filename、chunk_index、section、skills
-- 内置 LLM Rerank 重排序方法
+- RerankerService（Cross-Encoder 重排）
 
 ### LLM 接入（app/config.py）
 
